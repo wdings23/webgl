@@ -1,0 +1,7 @@
+﻿<shaders>
+  <program>
+    <name>flat</name>
+    <vertex>default8.vs</vertex>
+    <fragment>default8.fs</fragment>
+  </program>
+</shaders>
