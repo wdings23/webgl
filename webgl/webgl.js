@@ -39,9 +39,12 @@ function initGL()
         //gModel.loadFile("output.mdl");
 
         gCharacter = new Character();
-        gCharacter.loadFile('output.mdl');
 
-        gCamera = new Camera(new Vector3(0.0, 0.0, -50.0), new Vector3(0.0, 0.0, 100.0));
+        gCharacter.loadOBJ('mercy_rotated.obj');
+
+        //gCharacter.loadFile('output.mdl');
+
+        gCamera = new Camera(new Vector3(0.0, 3.0, -3.0), new Vector3(0.0, 3.0, 100.0));
 
         tick();
     }
@@ -67,7 +70,7 @@ var angle = 0.0;
 function update()
 {
     var up = new Vector3(0.0, 1.0, 0.0);
-    gCamera.position.z += 0.1;
+    //gCamera.position.z += 0.1;
     gCamera.update(up, 100.0, 1.0, 500.0, 500.0);
 }
 
@@ -143,8 +146,6 @@ function draw()
             gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 24, 0);
             gl.vertexAttribPointer(normalAttrib, 3, gl.FLOAT, false, 24, stride);
             gl.drawArrays(gl.TRIANGLES, 0, model.numFaces * 3);
-
-break;
         }
     }
 }

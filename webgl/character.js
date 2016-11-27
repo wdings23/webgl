@@ -22,11 +22,209 @@
     return pos;
 }
 
+function loadOBJ(lines, verts, norms, uvs, floatArray, lastLine)
+{
+    var name = null;
+    var material = null;
+    var numFaces = 0;
+
+    
+    for (var lineIndex = lastLine; lineIndex < lines.length; lineIndex++)
+    {
+        var line = lines[lineIndex];
+        var words = line.split(' ');
+
+        var firstWord = words[0];
+        
+        if (firstWord == 'g')
+        {
+            if (name == null)
+            {
+                name = words[1];
+            }
+            else
+            {
+                return [name, material, numFaces, lineIndex];
+            }
+        }
+        else if(firstWord == 'usemtl')
+        {
+            material = words[1];
+        }
+        else if (firstWord == 'v')
+        {
+            var x = parseFloat(words[1]);
+            var y = parseFloat(words[2]);
+            var z = parseFloat(words[3]);
+
+            var v = new Vector3(x, y, z);
+            verts.push(v);
+        }
+        else if(firstWord == 'vn')
+        {
+            var x = parseFloat(words[1]);
+            var y = parseFloat(words[2]);
+            var z = parseFloat(words[3]);
+
+            var n = new Vector3(x, y, z);
+            norms.push(n);
+        }
+        else if (firstWord == 'vt')
+        {
+            var x = parseFloat(words[1]);
+            var y = parseFloat(words[2]);
+
+            var t = new Vector3(x, y, 0.0);
+            uvs.push(t);
+        }
+        else if(firstWord == 'f')
+        {
+            var faceV = [];
+            var faceUV = [];
+            var faceNorm = [];
+
+            for(var i = 1; i < words.length; i++)
+            {
+                var start = 0;
+                var count = 0;
+                for(;;)
+                {
+                    if(start == -1)
+                    {
+                        break;
+                    }
+
+                    var end = words[i].indexOf('/', start);
+                    if (end == -1)
+                    {
+                        end = words[i].length;
+                    }
+
+                    var fStr = words[i].substring(start, end);
+                    var f = parseInt(fStr) - 1;
+                    start = end + 1;
+                    if (start >= words[i].length)
+                    {
+                        start = words[i].length - 1;
+                    }
+
+                    if (end >= words[i].length - 1)
+                    {
+                        start = -1;
+                    }
+
+                    if(count == 0)
+                    {
+                        faceV.push(f);
+                        //console.log('v ' + f);
+                    }
+                    else if(count == 1)
+                    {
+                        faceUV.push(f);
+                        //console.log('n ' + f);
+                    }
+                    else if(count == 2)
+                    {
+                        faceNorm.push(f);
+                        //console.log('t ' + f);
+                    }
+
+                    ++count;
+                }
+
+            }   // for i = 0 to num words
+
+
+            for(var i = 0; i < faceV.length; i++)
+            {
+                var vertIndex = faceV[i];
+                var normIndex = faceNorm[i];
+                var uvIndex = -1;
+
+                if(faceUV.length > i)
+                {
+                    uvIndex = faceUV[i];
+                }
+
+
+                floatArray.push(verts[vertIndex].x);
+                floatArray.push(verts[vertIndex].y);
+                floatArray.push(verts[vertIndex].z);
+
+                floatArray.push(norms[normIndex].x);
+                floatArray.push(norms[normIndex].y);
+                floatArray.push(norms[normIndex].z);
+
+                //if(uvIndex >= 0)
+                //{
+                //    floatArray.push(uvs[uvIndex].x);
+                //    floatArray.push(uvs[uvIndex].y);
+                //}
+            }
+
+            ++numFaces;
+
+        }   // if face
+
+
+
+    }   // for i = 0 to num lines
+
+    return [name, material, numFaces, -1];
+}
+
+
 Character = function (name)
 {
     this.name = name;
     this.models = [];
 }
+
+Character.prototype.loadOBJ = function(filename)
+{
+    var self = this;
+
+    var httpRequestClient = new XMLHttpRequest();
+    httpRequestClient.onreadystatechange = function () {
+        if (httpRequestClient.readyState == 4) {
+            var fileContent = httpRequestClient.responseText;
+
+            var lines = fileContent.split('\n');
+            var lastLine = 0;
+
+            var verts = [];
+            var norms = [];
+            var uvs = [];
+
+            for (; ;)
+            {
+                var floatArray = [];
+                var modelInfo = loadOBJ(lines, verts, norms, uvs, floatArray, lastLine);
+                lastLine = modelInfo[3];
+
+                var model = new Model(modelInfo[4]);
+                model.floatArray = new Float32Array(floatArray);
+                model.updateVBO();
+                model.numFaces = modelInfo[2];
+                model.name = modelInfo[0];
+                self.models.push(model);
+
+                console.log('loaded ' + model.name);
+
+                if(lastLine == -1)
+                {
+                    break;
+                }
+            }
+
+        }
+    }
+
+    httpRequestClient.open("GET", filename);
+    httpRequestClient.send();
+}
+
+
 
 Character.prototype.loadFile = function(filename)
 {

@@ -2,7 +2,6 @@ attribute vec3 position;
 attribute vec3 normal;
 
 vec4 lightDir = vec4(0.707, 0.707, 0.0, 1.0);
-// wtf
 varying vec4 vColor;
 uniform mat4 modelMatrix;
 //uniform mat4 viewMatrix;
