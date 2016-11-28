@@ -4,7 +4,12 @@ var gShaderManager;
 var gModel;
 var gCamera;
 var gCharacter;
+var gGun;
+var gEnvMap;
 
+/*
+**
+*/
 function initGL()
 {
     var canvas = document.getElementById("glcanvas");
@@ -26,30 +31,81 @@ function initGL()
 
         gShaderManager.readInAllShaders("shaders");
 
-        //var vertPos =
-	    //[
-		//    -0.5, 0.5, 0.0,
-		//    -0.5, -0.5, 0.0,
-		//    0.5, 0.5, 0.0,
-		//    0.5, -0.5, 0.0
-	    //];
-
-        //gVBO = createVBO(vertPos);
-        //gModel = new Model();
-        //gModel.loadFile("output.mdl");
+        gGun = new Character();
+        gGun.loadOBJ('zarya_gun.obj');
 
         gCharacter = new Character();
-
         gCharacter.loadOBJ('mercy_rotated.obj');
 
-        //gCharacter.loadFile('output.mdl');
+        gCamera = new Camera(new Vector3(0.0, 3.0, 2.0), new Vector3(0.0, 3.0, -100.0));
 
-        gCamera = new Camera(new Vector3(0.0, 3.0, -3.0), new Vector3(0.0, 3.0, 100.0));
+        document.addEventListener('keydown', onKeyDown);
+
+        gEnvMap = createCubeTexture(
+            [
+                ['rightImage', gl.TEXTURE_CUBE_MAP_POSITIVE_X],
+                ['leftImage', gl.TEXTURE_CUBE_MAP_NEGATIVE_X],
+                ['topImage', gl.TEXTURE_CUBE_MAP_POSITIVE_Y],
+                ['bottomImage', gl.TEXTURE_CUBE_MAP_NEGATIVE_Y],
+                ['backImage', gl.TEXTURE_CUBE_MAP_POSITIVE_Z],
+                ['frontImage', gl.TEXTURE_CUBE_MAP_NEGATIVE_Z],
+            ]);
 
         tick();
     }
 }
 
+/*
+**
+*/
+function onKeyDown(event)
+{
+    console.log('event = ' + event.key);
+
+    var up = new Vector3(0.0, 1.0, 0.0);
+    var zAxis = gCamera.lookAt.subtract(gCamera.position);
+    var xAxis = up.cross(zAxis);
+    var yAxis = zAxis.cross(xAxis);
+
+    xAxis.normalize();
+    yAxis.normalize();
+    zAxis.normalize();
+
+    var speed = 0.1;
+    var lookDistance = 100.0;
+    var lookAt = gCamera.lookAt.subtract(gCamera.position);
+    lookAt.normalize();
+
+    if(event.key == 'w')
+    {
+        gCamera.position.x += zAxis.x * speed;
+        gCamera.position.y += zAxis.y * speed;
+        gCamera.position.z += zAxis.z * speed;
+    }
+    else if (event.key == 's') {
+        gCamera.position.x -= zAxis.x * speed;
+        gCamera.position.y -= zAxis.y * speed;
+        gCamera.position.z -= zAxis.z * speed;
+    }
+    else if (event.key == 'a') {
+        gCamera.position.x -= xAxis.x * speed;
+        gCamera.position.y -= xAxis.y * speed;
+        gCamera.position.z -= xAxis.z * speed;
+    }
+    else if (event.key == 'd') {
+        gCamera.position.x += xAxis.x * speed;
+        gCamera.position.y += xAxis.y * speed;
+        gCamera.position.z += xAxis.z * speed;
+    }
+
+    gCamera.lookAt.x = gCamera.position.x + lookAt.x * lookDistance;
+    gCamera.lookAt.y = gCamera.position.y + lookAt.y * lookDistance;
+    gCamera.lookAt.z = gCamera.position.z + lookAt.z * lookDistance;
+}
+
+/*
+**
+*/
 function createVBO(vertPos)
 {
     vbo = gl.createBuffer();
@@ -59,64 +115,63 @@ function createVBO(vertPos)
     return vbo;
 }
 
+/*
+**
+*/
 function tick()
 {
     requestAnimationFrame(tick);
     update();
     draw();
+
+    updateUI();
 }
 
-var angle = 0.0;
+/*
+**
+*/
 function update()
 {
     var up = new Vector3(0.0, 1.0, 0.0);
-    //gCamera.position.z += 0.1;
     gCamera.update(up, 100.0, 1.0, 500.0, 500.0);
+
 }
 
-
+/*
+**
+*/
 function draw()
 {
     var matRotY = new Matrix44();
-    matRotY.rotateY(angle);
-
-    var matRotZ = new Matrix44();
-    matRotZ.rotateZ(0.0);
-
-    var totalRotMat = matRotZ.multiply(matRotY);
+    matRotY.rotateY(3.14159 * 1.87);
     
-    var totalMat = gCamera.matrix;
+    var matRotX = new Matrix44();
+    matRotX.rotateX(0.15);
+
+    var totalRot = matRotX.multiply(matRotY);
+
+    var matTrans = new Matrix44();
+    matTrans.translate(gCamera.position.x - 0.85, gCamera.position.y - 0.6, gCamera.position.z - 1.1);
+    var matModel = matTrans.multiply(totalRot);
+    
+    var totalMat = gCamera.matrix.multiply(matModel);
     var model = gCharacter.models[0];
     var componentCount = 0;
     var count = 0;
-
-    //for (var i = 0; i < 4; i++)
-    //{
-    //    console.log(gCamera.projectionMatrix.entries[i * 4] + ' ' + gCamera.projectionMatrix.entries[i * 4 + 1] + ' ' + gCamera.projectionMatrix.entries[i * 4 + 2] + ' ' + gCamera.projectionMatrix.entries[i * 4 + 3]);
-    //}
-
-    //console.log('**********');
-    //for (var i = 0; i < 21; i++) {
-    //    var v = new Vector4(model.vertices[i*3], model.vertices[i*3+1], model.vertices[i*3+2], 1.0);
-    //    var world = gCamera.viewMatrix.xform(v);
-    //    var frustum = gCamera.projectionMatrix.xform(world);
-    //    var total = gCamera.matrix.xform(v);
-
-    //    console.log(i);
-    //    console.log('orig (' + v.x + ', ' + v.y + ', ' + v.z + ', ' + v.w + ')');
-    //    console.log('world (' + world.x + ', ' + world.y + ', ' + world.z + ', ' + world.w + ')');
-    //    console.log('frustum (' + (frustum.x / frustum.w) + ', ' + (frustum.y / frustum.w) + ', ' + (frustum.z / frustum.w) + ', ' + (frustum.w / frustum.w) + ')');
-    //    console.log('total (' + (total.x / total.w) + ', ' + (total.y / total.w) + ', ' + (total.z / total.w) + ', ' + (total.w / total.w) + ')');
-    //    console.log('**********');
-    //}
 
     var shaderProgram = gShaderManager.getShaderProgram("flat");
     if (shaderProgram)
     {
         gl.useProgram(shaderProgram.program);
 
+        // uniforms
         var colorUniform = gl.getUniformLocation(shaderProgram.program, "color");
         var modelMatrixUniform = gl.getUniformLocation(shaderProgram.program, "modelMatrix");
+        var viewMatrixUniform = gl.getUniformLocation(shaderProgram.program, 'viewMatrix');
+        var projectionMatrixUniform = gl.getUniformLocation(shaderProgram.program, 'projMatrix');
+        var normalMatrixUniform = gl.getUniformLocation(shaderProgram.program, 'normMatrix');
+
+        var lightPosUniform = gl.getUniformLocation(shaderProgram.program, 'lightPos');
 
         var red = Math.random();
         var green = Math.random();
@@ -124,11 +179,10 @@ function draw()
         var colorArray = [1.0, 1.0, 1.0, 1.0];
         gl.uniform4fv(colorUniform, new Float32Array(colorArray))
 
-        if (modelMatrixUniform)
-        {
-            gl.uniformMatrix4fv(modelMatrixUniform, false, new Float32Array(totalMat.entries));
-        }
+        var lightPos = [-5.0, 20.0, 0.0, 1.0];
+        gl.uniform4fv(lightPosUniform, new Float32Array(lightPos));
 
+        // attribs (position and normal)
         var vertexAttrib = gl.getAttribLocation(shaderProgram.program, "position");
         gl.enableVertexAttribArray(vertexAttrib);
 
@@ -137,15 +191,133 @@ function draw()
 
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-        //
         var stride = 3 * Float32Array.BYTES_PER_ELEMENT;
-        for (var i = 0; i < gCharacter.models.length; i++) {
+
+        // matrix uniforms
+        if (modelMatrixUniform)
+        {
+            gl.uniformMatrix4fv(modelMatrixUniform, false, new Float32Array(matModel.entries));
+        }
+
+        if (viewMatrixUniform)
+        {
+            gl.uniformMatrix4fv(viewMatrixUniform, false, new Float32Array(gCamera.viewMatrix.entries));
+        }
+
+        if (projectionMatrixUniform)
+        {
+            gl.uniformMatrix4fv(projectionMatrixUniform, false, new Float32Array(gCamera.projectionMatrix.entries));
+        }
+
+        if (normalMatrixUniform)
+        {
+            var orthonormalViewMatrix = gCamera.viewMatrix;
+            orthonormalViewMatrix.entries[12] = orthonormalViewMatrix.entries[13] = orthonormalViewMatrix.entries[14] = 0.0;
+
+            var totalNormMatrix = matRotY.multiply(orthonormalViewMatrix);
+            gl.uniformMatrix4fv(normalMatrixUniform, false, new Float32Array(totalNormMatrix.entries));
+        }
+
+        // environment texture
+        gl.enable(gl.TEXTURE_CUBE_MAP);
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, gEnvMap);
+        gl.activeTexture(gl.TEXTURE0);
+
+        // model
+        for (var i = 0; i < gGun.models.length; i++)
+        {
+            var model = gGun.models[i];
+            gl.bindBuffer(gl.ARRAY_BUFFER, model.vbo)
+            gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 24, 0);
+            gl.vertexAttribPointer(normalAttrib, 3, gl.FLOAT, false, 24, stride);
+            gl.drawArrays(gl.TRIANGLES, 0, model.numFaces * 3);
+        }
+
+        // character
+        var identity = new Matrix44();
+        if (modelMatrixUniform)
+        {
+            gl.uniformMatrix4fv(modelMatrixUniform, false, new Float32Array(identity.entries));
+        }
+
+        if (normalMatrixUniform)
+        {
+            gl.uniformMatrix4fv(normalMatrixUniform, false, new Float32Array(identity.entries));
+        }
+
+        for (var i = 0; i < gCharacter.models.length; i++)
+        {
             var model = gCharacter.models[i];
 
             gl.bindBuffer(gl.ARRAY_BUFFER, model.vbo)
             gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 24, 0);
             gl.vertexAttribPointer(normalAttrib, 3, gl.FLOAT, false, 24, stride);
             gl.drawArrays(gl.TRIANGLES, 0, model.numFaces * 3);
-        }
+        }   
     }
+}
+
+/*
+**
+*/
+function updateUI()
+{
+    var pos = document.getElementById('position');
+    pos.innerText = gCamera.position.x + ' ' + gCamera.position.y + ' ' + gCamera.position.z;
+
+    var lookAt = document.getElementById('lookAt');
+    lookAt.innerText = gCamera.lookAt.x + ' ' + gCamera.lookAt.y + ' ' + gCamera.lookAt.z;
+}
+
+/*
+**
+*/
+function createTexture(id)
+{
+    var texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        document.getElementById(id));
+
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
+}
+
+/*
+**
+*/
+function createCubeTexture(ids) {
+    var texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
+    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+    for (var i = 0; i < ids.length; i++) {
+        var id = ids[i][0];
+        var faceSide = ids[i][1];
+
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
+        gl.texImage2D(
+            faceSide,
+            0,
+            gl.RGBA,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            document.getElementById(id));
+    }
+
+    gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
+
+    return texture;
 }

@@ -24,9 +24,11 @@ Matrix44.prototype.identity = function ()
 
 Matrix44.prototype.translate = function (x, y, z)
 {
-    this.entries[13] = x;
-    this.entries[14] = y;
-    this.entries[15] = z;
+    this.identity();
+
+    this.entries[12] = x;
+    this.entries[13] = y;
+    this.entries[14] = z;
 }
 
 Matrix44.prototype.scale = function (x, y, z)

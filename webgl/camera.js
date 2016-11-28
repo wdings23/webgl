@@ -38,12 +38,14 @@ Camera.prototype.update = function(up, far, near, width, height)
 
     this.viewMatrix = rotMatrix.multiply(transMatrix);
 
-    var f = 1.0 / Math.tan(90.0 / 2.0);
+    var f = Math.tan(Math.PI / 3.);
 
     var oneOverFarMinusNear = 1.0 / (far - near);
-   
+    var aspectRatio = 1280.0 / 768.0;
+
+
     this.projectionMatrix.entries[0] = f;
-    this.projectionMatrix.entries[5] = f;
+    this.projectionMatrix.entries[5] = f * aspectRatio;
 
     this.projectionMatrix.entries[10] = (far + near) * oneOverFarMinusNear;
     this.projectionMatrix.entries[11] = -1.0;
@@ -55,5 +57,4 @@ Camera.prototype.update = function(up, far, near, width, height)
     this.projectionMatrix = mat;
 
     this.matrix = this.projectionMatrix.multiply(this.viewMatrix);
-    var debug = 1;
 }
