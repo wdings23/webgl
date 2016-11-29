@@ -36,7 +36,7 @@ ShaderManager.prototype.readInAllShaders = function (shaderHTMLID)
 {
     var shaderManager = this;   // need to save this when getting into onreadystatechange function below
 
-    var shaderScriptTag = document.getElementById(shaderHTMLID);
+    var shaderScriptTag = document.getElementById(shaderHTMLID +'?random=1');
     var client = new XMLHttpRequest();
     client.onreadystatechange = function () {
         if (client.readyState == 4 && client.status == 200) {
@@ -63,7 +63,9 @@ ShaderManager.prototype.readInAllShaders = function (shaderHTMLID)
     }
 
     //client.open("GET", shaderScriptTag.src);
-    client.open("GET", "http://localhost:8000/shaders.xml");
+    client.open("GET", "http://localhost:8000/shaders.xml", true);
+    client.setRequestHeader('Cache-Control', 'no-cache');
+    client.setRequestHeader('Pragma', 'no-cache');
     client.send();
 }
 
@@ -98,6 +100,8 @@ function compileShaderProgram(shaderManager, programName, vertexSrc, fragmentSrc
     }
 
     vertexClient.open("GET", vertexSrc);
+    vertexClient.setRequestHeader('Cache-Control', 'no-cache');
+    vertexClient.setRequestHeader('Pragma', 'no-cache');
     vertexClient.send();
 
     // get the shader file as new http request
@@ -129,6 +133,8 @@ function compileShaderProgram(shaderManager, programName, vertexSrc, fragmentSrc
     }
 
     fragmentClient.open("GET", fragmentSrc);
+    fragmentClient.setRequestHeader('Cache-Control', 'no-cache');
+    fragmentClient.setRequestHeader('Pragma', 'no-cache');
     fragmentClient.send();
 }
 

@@ -170,8 +170,13 @@ function draw()
         var viewMatrixUniform = gl.getUniformLocation(shaderProgram.program, 'viewMatrix');
         var projectionMatrixUniform = gl.getUniformLocation(shaderProgram.program, 'projMatrix');
         var normalMatrixUniform = gl.getUniformLocation(shaderProgram.program, 'normMatrix');
-
         var lightPosUniform = gl.getUniformLocation(shaderProgram.program, 'lightPos');
+
+        var sampleCoordUniform = gl.getUniformLocation(shaderProgram.program, 'afSamplePos');
+        
+        var samplePos = getSampleCoords(64);
+        gl.uniform2fv(sampleCoordUniform, new Float32Array(samplePos));
+        
 
         var red = Math.random();
         var green = Math.random();
@@ -219,7 +224,6 @@ function draw()
         }
 
         // environment texture
-        gl.enable(gl.TEXTURE_CUBE_MAP);
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, gEnvMap);
         gl.activeTexture(gl.TEXTURE0);
 
@@ -320,4 +324,38 @@ function createCubeTexture(ids) {
     gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
 
     return texture;
+}
+
+/*
+**
+*/
+function radicalInverseVDC(iBits)
+{
+	iBits = (iBits << 16) | (iBits >> 16);
+    iBits = ((iBits & 0x55555555) << 1) | ((iBits & 0xAAAAAAAA) >> 1);
+    iBits = ((iBits & 0x33333333) << 2) | ((iBits & 0xCCCCCCCC) >> 2);
+    iBits = ((iBits & 0x0F0F0F0F) << 4) | ((iBits & 0xF0F0F0F0) >> 4);
+    iBits = ((iBits & 0x00FF00FF) << 8) | ((iBits & 0xFF00FF00) >> 8);
+
+    //return (iBits / 0x100000000);
+    return (iBits * 2.3283064365386963e-10);
+}
+
+/*
+**
+*/
+function getSampleCoords(numSamples)
+{
+    var ret = [];
+
+    for(var i = 0; i < numSamples; i++)
+    {
+        var xiX = i / numSamples;
+        var xiY = radicalInverseVDC(i);
+
+        ret.push(xiX);
+        ret.push(xiY);
+    }
+
+    return ret;
 }
