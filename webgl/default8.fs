@@ -163,6 +163,4 @@ void main()
 
 	gl_FragColor = vec4(diffuse(vNorm) * fRoughness + brdf(vNorm) * (1.0 - fRoughness), 1.0) * albedo;
 	//gl_FragColor = vec4(diffuse(vNorm), 1.0);
-
-	
 }
