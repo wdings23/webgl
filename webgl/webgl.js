@@ -6,6 +6,8 @@ var gCamera;
 var gCharacter;
 var gGun;
 var gEnvMap;
+var gBob;
+var gBobInc;
 
 /*
 **
@@ -35,7 +37,13 @@ function initGL()
         gGun.loadOBJ('zarya_gun.obj');
 
         gCharacter = new Character();
-        gCharacter.loadOBJ('mercy_rotated.obj');
+        gCharacter.loadOBJ('Mercy_Witch.obj');
+
+        gCharacter.loadTextures(['body_d.jpg', 'eyeball_iris.jpg', 'hair_d.jpg', 'staff_d.jpg', 'teeth_d.jpg', 'wingglow_d.png', 'wings.jpg'])
+        gCharacter.textureMappings =
+        [
+            3, 0, 0, 0, 0, 0, 3, 0, 0, 0, 5, 2,
+        ];
 
         gCamera = new Camera(new Vector3(0.0, 3.0, 2.0), new Vector3(0.0, 3.0, -100.0));
 
@@ -50,6 +58,9 @@ function initGL()
                 ['backImage', gl.TEXTURE_CUBE_MAP_POSITIVE_Z],
                 ['frontImage', gl.TEXTURE_CUBE_MAP_NEGATIVE_Z],
             ]);
+
+        gBob = 0.0;
+        gBobInc = 1.0;
 
         tick();
     }
@@ -101,6 +112,12 @@ function onKeyDown(event)
     gCamera.lookAt.x = gCamera.position.x + lookAt.x * lookDistance;
     gCamera.lookAt.y = gCamera.position.y + lookAt.y * lookDistance;
     gCamera.lookAt.z = gCamera.position.z + lookAt.z * lookDistance;
+
+    if (Math.abs(gBob) > 0.5) {
+        gBobInc *= -1.0;
+    }
+
+    gBob += (gBobInc * 0.05);
 }
 
 /*
@@ -134,7 +151,6 @@ function update()
 {
     var up = new Vector3(0.0, 1.0, 0.0);
     gCamera.update(up, 100.0, 1.0, 500.0, 500.0);
-
 }
 
 /*
@@ -149,9 +165,9 @@ function draw()
     matRotX.rotateX(0.15);
 
     var totalRot = matRotX.multiply(matRotY);
-
+   
     var matTrans = new Matrix44();
-    matTrans.translate(gCamera.position.x - 0.85, gCamera.position.y - 0.6, gCamera.position.z - 1.1);
+    matTrans.translate(gCamera.position.x - 0.85, (gCamera.position.y - 0.6) + gBob, gCamera.position.z - 1.1);
     var matModel = matTrans.multiply(totalRot);
     
     var totalMat = gCamera.matrix.multiply(matModel);
@@ -170,14 +186,15 @@ function draw()
         var viewMatrixUniform = gl.getUniformLocation(shaderProgram.program, 'viewMatrix');
         var projectionMatrixUniform = gl.getUniformLocation(shaderProgram.program, 'projMatrix');
         var normalMatrixUniform = gl.getUniformLocation(shaderProgram.program, 'normMatrix');
-
         var lightPosUniform = gl.getUniformLocation(shaderProgram.program, 'lightPos');
 
-        var red = Math.random();
-        var green = Math.random();
-        var blue = Math.random();
-        var colorArray = [1.0, 1.0, 1.0, 1.0];
-        gl.uniform4fv(colorUniform, new Float32Array(colorArray))
+        var sampleCoordUniform = gl.getUniformLocation(shaderProgram.program, 'afSamplePos');
+        var eyeCoordUniform = gl.getUniformLocation(shaderProgram.program, 'eyePos');
+
+        var samplePos = getSampleCoords(256);
+        gl.uniform2fv(sampleCoordUniform, new Float32Array(samplePos));
+        
+        gl.uniform3f(eyeCoordUniform, gCamera.position.x, gCamera.position.y, gCamera.position.z);
 
         var lightPos = [-5.0, 20.0, 0.0, 1.0];
         gl.uniform4fv(lightPosUniform, new Float32Array(lightPos));
@@ -188,6 +205,14 @@ function draw()
 
         var normalAttrib = gl.getAttribLocation(shaderProgram.program, "normal");
         gl.enableVertexAttribArray(normalAttrib);
+
+        var uvAttrib = gl.getAttribLocation(shaderProgram.program, "uv");
+        gl.enableVertexAttribArray(uvAttrib);
+
+        var tex0Uniform = gl.getUniformLocation(shaderProgram.program, 'sampler');
+        var tex1Uniform = gl.getUniformLocation(shaderProgram.program, 'albedoSampler');
+        gl.uniform1i(tex0Uniform, 0);
+        gl.uniform1i(tex1Uniform, 1);
 
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
@@ -219,7 +244,6 @@ function draw()
         }
 
         // environment texture
-        gl.enable(gl.TEXTURE_CUBE_MAP);
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, gEnvMap);
         gl.activeTexture(gl.TEXTURE0);
 
@@ -228,8 +252,9 @@ function draw()
         {
             var model = gGun.models[i];
             gl.bindBuffer(gl.ARRAY_BUFFER, model.vbo)
-            gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 24, 0);
-            gl.vertexAttribPointer(normalAttrib, 3, gl.FLOAT, false, 24, stride);
+            gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 32, 0);
+            gl.vertexAttribPointer(normalAttrib, 3, gl.FLOAT, false, 32, stride);
+            gl.vertexAttribPointer(uvAttrib, 2, gl.FLOAT, false, 32, stride + stride);
             gl.drawArrays(gl.TRIANGLES, 0, model.numFaces * 3);
         }
 
@@ -249,9 +274,13 @@ function draw()
         {
             var model = gCharacter.models[i];
 
+            gl.activeTexture(gl.TEXTURE0 + 1);
+            gl.bindTexture(gl.TEXTURE_2D, gCharacter.textures[gCharacter.textureMappings[i]]);
+            
             gl.bindBuffer(gl.ARRAY_BUFFER, model.vbo)
-            gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 24, 0);
-            gl.vertexAttribPointer(normalAttrib, 3, gl.FLOAT, false, 24, stride);
+            gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 32, 0);
+            gl.vertexAttribPointer(normalAttrib, 3, gl.FLOAT, false, 32, stride);
+            gl.vertexAttribPointer(uvAttrib, 2, gl.FLOAT, false, 32, stride + stride);
             gl.drawArrays(gl.TRIANGLES, 0, model.numFaces * 3);
         }   
     }
@@ -320,4 +349,38 @@ function createCubeTexture(ids) {
     gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
 
     return texture;
+}
+
+/*
+**
+*/
+function radicalInverseVDC(iBits)
+{
+	iBits = (iBits << 16) | (iBits >> 16);
+    iBits = ((iBits & 0x55555555) << 1) | ((iBits & 0xAAAAAAAA) >> 1);
+    iBits = ((iBits & 0x33333333) << 2) | ((iBits & 0xCCCCCCCC) >> 2);
+    iBits = ((iBits & 0x0F0F0F0F) << 4) | ((iBits & 0xF0F0F0F0) >> 4);
+    iBits = ((iBits & 0x00FF00FF) << 8) | ((iBits & 0xFF00FF00) >> 8);
+
+    //return (iBits / 0x100000000);
+    return (iBits * 2.3283064365386963e-10);
+}
+
+/*
+**
+*/
+function getSampleCoords(numSamples)
+{
+    var ret = [];
+
+    for(var i = 0; i < numSamples; i++)
+    {
+        var xiX = i / numSamples;
+        var xiY = radicalInverseVDC(i);
+
+        ret.push(xiX);
+        ret.push(xiY);
+    }
+
+    return ret;
 }

@@ -28,7 +28,6 @@ function loadOBJ(lines, verts, norms, uvs, floatArray, lastLine)
     var material = null;
     var numFaces = 0;
 
-    
     for (var lineIndex = lastLine; lineIndex < lines.length; lineIndex++)
     {
         var line = lines[lineIndex];
@@ -36,7 +35,7 @@ function loadOBJ(lines, verts, norms, uvs, floatArray, lastLine)
 
         var firstWord = words[0];
         
-        if (firstWord == 'g')
+        if (firstWord == 'g' || firstWord == 'o')
         {
             if (name == null)
             {
@@ -155,11 +154,16 @@ function loadOBJ(lines, verts, norms, uvs, floatArray, lastLine)
                 floatArray.push(norms[normIndex].y);
                 floatArray.push(norms[normIndex].z);
 
-                //if(uvIndex >= 0)
-                //{
-                //    floatArray.push(uvs[uvIndex].x);
-                //    floatArray.push(uvs[uvIndex].y);
-                //}
+                if(uvIndex >= 0)
+                {
+                    floatArray.push(uvs[uvIndex].x);
+                    floatArray.push(uvs[uvIndex].y);
+                }
+                else
+                {
+                    floatArray.push(0.0);
+                    floatArray.push(0.0);
+                }
             }
 
             ++numFaces;
@@ -178,6 +182,7 @@ Character = function (name)
 {
     this.name = name;
     this.models = [];
+    this.textures = [];
 }
 
 Character.prototype.loadOBJ = function(filename)
@@ -224,8 +229,9 @@ Character.prototype.loadOBJ = function(filename)
     httpRequestClient.send();
 }
 
-
-
+/*
+**
+*/
 Character.prototype.loadFile = function(filename)
 {
     var self = this;
@@ -315,4 +321,44 @@ Character.prototype.loadFile = function(filename)
 
     httpRequestClient.open("GET", filename);
     httpRequestClient.send();
+}
+
+/*
+**
+*/
+Character.prototype.loadTextures = function(textureNames)
+{
+    this.textures = new Array(textureNames.length);
+
+    for (var i = 0; i < textureNames.length; i++) {
+        var textureName = textureNames[i];
+
+        var texture = gl.createTexture();
+        var self = this;
+        texture.image = new Image();
+        texture.image.texture = texture;
+        texture.image.onload = function () {
+            gl.bindTexture(gl.TEXTURE_2D, this.texture);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texImage2D(
+                gl.TEXTURE_2D,
+                0,
+                gl.RGBA,
+                gl.RGBA,
+                gl.UNSIGNED_BYTE,
+                this);
+
+            gl.bindTexture(gl.TEXTURE_2D, null);
+
+            self.textures[this.index] = this.texture;
+        }
+
+        texture.image.src = textureName;
+        texture.image.index = i;
+    }
+
+    
 }
