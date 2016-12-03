@@ -39,11 +39,56 @@ function initGL()
         gCharacter = new Character();
         gCharacter.loadOBJ('Mercy_Witch.obj');
 
-        gCharacter.loadTextures(['body_d.jpg', 'eyeball_iris.jpg', 'hair_d.jpg', 'staff_d.jpg', 'teeth_d.jpg', 'wingglow_d.png', 'wings.jpg'])
-        gCharacter.textureMappings =
+        gCharacter.loadTextures([
+            'body_d.jpg',
+            'eyeball_iris.jpg',
+            'hair_d.jpg',
+            'staff_d.jpg',
+            'teeth_d.jpg',
+            'wingglow_d.png',
+            'wings.jpg',
+            'body_e.jpg',
+            'staff_e.jpg',
+            'hair_e.jpg',
+            'default_rough.png',
+            'staff_hud.jpg']);
+        gCharacter.diffuseTextureMappings =
         [
-            3, 0, 0, 0, 0, 0, 3, 0, 0, 0, 5, 2,
+            11,
+            0,
+            0,
+            0,
+            0,
+            1,
+            3,
+            1,
+            0,
+            3,
+            0,
+            0,
+            3,
+            5,
+            2,
         ];
+
+        gCharacter.pbrMappings =
+        [
+            10,
+            7,
+            7,
+            7,
+            7,
+            10,
+            10,
+            10,
+            7,
+            8,
+            7,
+            7,
+            8,
+            10,
+            9,
+        ]
 
         gCamera = new Camera(new Vector3(0.0, 3.0, 2.0), new Vector3(0.0, 3.0, -100.0));
 
@@ -92,26 +137,48 @@ function onKeyDown(event)
         gCamera.position.x += zAxis.x * speed;
         gCamera.position.y += zAxis.y * speed;
         gCamera.position.z += zAxis.z * speed;
+
+        gCamera.lookAt.x = gCamera.position.x + lookAt.x * lookDistance;
+        gCamera.lookAt.y = gCamera.position.y + lookAt.y * lookDistance;
+        gCamera.lookAt.z = gCamera.position.z + lookAt.z * lookDistance;
     }
     else if (event.key == 's') {
         gCamera.position.x -= zAxis.x * speed;
         gCamera.position.y -= zAxis.y * speed;
         gCamera.position.z -= zAxis.z * speed;
+
+        gCamera.lookAt.x = gCamera.position.x + lookAt.x * lookDistance;
+        gCamera.lookAt.y = gCamera.position.y + lookAt.y * lookDistance;
+        gCamera.lookAt.z = gCamera.position.z + lookAt.z * lookDistance;
     }
     else if (event.key == 'a') {
         gCamera.position.x -= xAxis.x * speed;
         gCamera.position.y -= xAxis.y * speed;
         gCamera.position.z -= xAxis.z * speed;
+
+        gCamera.lookAt.x = gCamera.position.x + lookAt.x * lookDistance;
+        gCamera.lookAt.y = gCamera.position.y + lookAt.y * lookDistance;
+        gCamera.lookAt.z = gCamera.position.z + lookAt.z * lookDistance;
     }
     else if (event.key == 'd') {
         gCamera.position.x += xAxis.x * speed;
         gCamera.position.y += xAxis.y * speed;
         gCamera.position.z += xAxis.z * speed;
+
+        gCamera.lookAt.x = gCamera.position.x + lookAt.x * lookDistance;
+        gCamera.lookAt.y = gCamera.position.y + lookAt.y * lookDistance;
+        gCamera.lookAt.z = gCamera.position.z + lookAt.z * lookDistance;
+    }
+    else if (event.key == 'ArrowUp') {
+        gCamera.position.y += speed;
+        gCamera.lookAt.y += speed;
+    }
+    else if (event.key == 'ArrowDown') {
+        gCamera.position.y -= speed;
+        gCamera.lookAt.y -= speed;
     }
 
-    gCamera.lookAt.x = gCamera.position.x + lookAt.x * lookDistance;
-    gCamera.lookAt.y = gCamera.position.y + lookAt.y * lookDistance;
-    gCamera.lookAt.z = gCamera.position.z + lookAt.z * lookDistance;
+    
 
     if (Math.abs(gBob) > 0.5) {
         gBobInc *= -1.0;
@@ -191,7 +258,7 @@ function draw()
         var sampleCoordUniform = gl.getUniformLocation(shaderProgram.program, 'afSamplePos');
         var eyeCoordUniform = gl.getUniformLocation(shaderProgram.program, 'eyePos');
 
-        var samplePos = getSampleCoords(256);
+        var samplePos = getSampleCoords(128);
         gl.uniform2fv(sampleCoordUniform, new Float32Array(samplePos));
         
         gl.uniform3f(eyeCoordUniform, gCamera.position.x, gCamera.position.y, gCamera.position.z);
@@ -211,8 +278,10 @@ function draw()
 
         var tex0Uniform = gl.getUniformLocation(shaderProgram.program, 'sampler');
         var tex1Uniform = gl.getUniformLocation(shaderProgram.program, 'albedoSampler');
+        var tex2Uniform = gl.getUniformLocation(shaderProgram.program, 'roughRefractSampler');
         gl.uniform1i(tex0Uniform, 0);
         gl.uniform1i(tex1Uniform, 1);
+        gl.uniform1i(tex2Uniform, 2);
 
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
@@ -275,8 +344,11 @@ function draw()
             var model = gCharacter.models[i];
 
             gl.activeTexture(gl.TEXTURE0 + 1);
-            gl.bindTexture(gl.TEXTURE_2D, gCharacter.textures[gCharacter.textureMappings[i]]);
+            gl.bindTexture(gl.TEXTURE_2D, gCharacter.textures[gCharacter.diffuseTextureMappings[i]]);
             
+            gl.activeTexture(gl.TEXTURE0 + 2);
+            gl.bindTexture(gl.TEXTURE_2D, gCharacter.textures[gCharacter.pbrMappings[i]]);
+
             gl.bindBuffer(gl.ARRAY_BUFFER, model.vbo)
             gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 32, 0);
             gl.vertexAttribPointer(normalAttrib, 3, gl.FLOAT, false, 32, stride);
@@ -345,6 +417,8 @@ function createCubeTexture(ids) {
             gl.UNSIGNED_BYTE,
             document.getElementById(id));
     }
+
+    gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
 
     gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
 

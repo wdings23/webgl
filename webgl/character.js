@@ -28,6 +28,7 @@ function loadOBJ(lines, verts, norms, uvs, floatArray, lastLine)
     var material = null;
     var numFaces = 0;
 
+    var lastFirstWord = null;
     for (var lineIndex = lastLine; lineIndex < lines.length; lineIndex++)
     {
         var line = lines[lineIndex];
@@ -49,6 +50,12 @@ function loadOBJ(lines, verts, norms, uvs, floatArray, lastLine)
         else if(firstWord == 'usemtl')
         {
             material = words[1];
+            
+            if(lastFirstWord == 'f')
+            {
+                name = material;
+                return [name, material, numFaces, lineIndex];
+            }
         }
         else if (firstWord == 'v')
         {
@@ -170,7 +177,7 @@ function loadOBJ(lines, verts, norms, uvs, floatArray, lastLine)
 
         }   // if face
 
-
+        lastFirstWord = firstWord;
 
     }   // for i = 0 to num lines
 
@@ -201,6 +208,7 @@ Character.prototype.loadOBJ = function(filename)
             var norms = [];
             var uvs = [];
 
+            var lastName = '';
             for (; ;)
             {
                 var floatArray = [];
@@ -213,6 +221,17 @@ Character.prototype.loadOBJ = function(filename)
                 model.numFaces = modelInfo[2];
                 model.name = modelInfo[0];
                 self.models.push(model);
+
+                if (lastLine > 0) {
+                    var words = lines[lastLine].split(' ');
+                    if (words[0] == 'usemtl') {
+                        model.name = lastName + '_' + model.name;
+                    }
+                    else
+                    {
+                        lastName = model.name;
+                    }
+                }
 
                 console.log('loaded ' + model.name);
 
