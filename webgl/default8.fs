@@ -2,9 +2,11 @@
 
 precision highp float;
 
-uniform samplerCube sampler;
+uniform samplerCube environmentSampler;
 uniform sampler2D albedoSampler;
-uniform sampler2D roughRefractSampler;
+uniform sampler2D metalnessSampler;
+uniform sampler2D roughnessSampler;
+uniform sampler2D normalSampler;
 
 uniform vec4 color;
 uniform vec2 afSamplePos[NUM_SAMPLES];
@@ -108,7 +110,7 @@ vec3 diffuse(vec3 normal)
 		vec3 halfV = importanceSampleGGX(afSamplePos[i], 1.0, normal, tangent, binormal);
 		if(dot(halfV, normal) > 0.0)
 		{
-			vec4 color = textureCube(sampler, halfV, 0.0) / 3.14159;
+			vec4 color = textureCube(environmentSampler, halfV, 0.0) / 3.14159;
 			ret.xyz += color.xyz;
 			fTotal += 1.0;
 		}
@@ -131,7 +133,7 @@ vec3 diffuse(vec3 normal)
 		float fNDotL = dot(normal, lightV);
 		if (fNDotL > 0.0)
 		{
-			vec4 color = textureCube(sampler, lightV, 0.0);
+			vec4 color = textureCube(environmentSampler, lightV, 0.0);
 			ret.xyz += color.xyz;
 			fTotal += 1.0;
 		}	
@@ -169,7 +171,7 @@ vec3 brdf(vec3 normal, float fRoughness, float fRefract)
 		float fLDotH = clamp(dot(lightV, halfV), 0.0, 1.0);
 
 		float fLOD = distribution(fNDotH, fVDotH, fRoughness);
-		vec4 color = textureCube(sampler, lightV, fLOD);
+		vec4 color = textureCube(environmentSampler, lightV, fLOD);
 
 		float fFresnel = fresnel(fVDotH, fRefract);
 		float fGeometry = geometry(fVDotH, fLDotH, fRoughness);
@@ -189,30 +191,52 @@ vec3 brdf(vec3 normal, float fRoughness, float fRefract)
 */
 void main()
 {
-	//vec4 texColor = textureCube(sampler, vNorm);
+	//vec4 texColor = textureCube(environmentSampler, vNorm);
 	//gl_FragColor = texColor;// + vColor * 0.5;
 
 	vec2 invertUV = vUV;
 	invertUV.y = 1.0 - invertUV.y;
 
 	vec4 albedo = texture2D(albedoSampler, invertUV);
+	vec4 metalnessColor = texture2D(metalnessSampler, invertUV);
+	vec4 roughnessColor = texture2D(roughnessSampler, invertUV);
+	vec4 normalColor = texture2D(normalSampler, invertUV) * 2.0 - 1.0;
+	normalColor.w = 1.0;
 
-	vec4 roughRefractColor = texture2D(roughRefractSampler, vUV);
-	float fRoughness = 1.0 - roughRefractColor.x;
-	float fRefract = 0.1;
+	float fRoughness = roughnessColor.x;
+	float fMetalVal = metalnessColor.x;
+	float fRefract = 0.03;
 
-	float fMetalVal = (roughRefractColor.y - 0.53) * 2.0;
+	// tangent space vectors
+	vec3 up = vec3(0.0, 0.0, 1.0);
+	if(vNorm.z >= 0.9999)
+	{
+		up = vec3(1.0, 0.0, 0.0);
+	}
+	vec3 tangent = normalize(cross(up, vNorm));
+	vec3 binormal = normalize(cross(vNorm, tangent));
 
-	vec3 KDiffuse = diffuse(vNorm);
-	vec3 KSpecular = brdf(vNorm, fRoughness, fRefract);
+	// convert normal map from tangent space to world
+	mat4 worldSpaceMat;
+	worldSpaceMat[0] = vec4(tangent.xyz, 0.0);
+	worldSpaceMat[1] = vec4(binormal.xyz, 0.0);
+	worldSpaceMat[2] = vec4(vNorm.xyz, 0.0);
+	worldSpaceMat[3] = vec4(0.0, 0.0, 0.0, 1.0);
+	
+	vec4 worldSpaceNormal = worldSpaceMat * normalColor;
+	vec3 worldSpaceNormal3 = vec3(worldSpaceNormal.xyz);
+
+	vec3 KDiffuse = diffuse(worldSpaceNormal3);
+	vec3 KSpecular = brdf(worldSpaceNormal3, fRoughness, fRefract);
 	vec3 dielectric = KDiffuse + KSpecular;
 	vec3 metal = KSpecular;
 	vec3 color = dielectric * (fMetalVal) + metal * (1.0 - fMetalVal);
-	gl_FragColor = vec4(color, 1.0) * albedo;
-	
+	//gl_FragColor = vec4(dielectric * (1.0 - fMetalVal) + metal * fMetalVal, 1.0) * albedo;
+	gl_FragColor = vec4(KSpecular, 1.0);
 
 	//vec3 color = diffuse(vNorm) + brdf(vNorm, fRoughness, fRefract);
 	//gl_FragColor = vec4(color, 1.0) * albedo;
-	gl_FragColor = vec4(dielectric * (1.0 - fMetalVal) + metal * fMetalVal, 1.0) * albedo;
 	//gl_FragColor = vec4(brdf(vNorm, fRoughness, fRefract), 1.0) * albedo;
+
+	//gl_FragColor = vec4(worldSpaceNormal.xyz, 1.0);
 }

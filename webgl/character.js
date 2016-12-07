@@ -144,7 +144,7 @@ function loadOBJ(lines, verts, norms, uvs, floatArray, lastLine)
             for(var i = 0; i < faceV.length; i++)
             {
                 var vertIndex = faceV[i];
-                var normIndex = faceNorm[i];
+                var normIndex = -1;
                 var uvIndex = -1;
 
                 if(faceUV.length > i)
@@ -152,14 +152,22 @@ function loadOBJ(lines, verts, norms, uvs, floatArray, lastLine)
                     uvIndex = faceUV[i];
                 }
 
-
                 floatArray.push(verts[vertIndex].x);
                 floatArray.push(verts[vertIndex].y);
                 floatArray.push(verts[vertIndex].z);
 
-                floatArray.push(norms[normIndex].x);
-                floatArray.push(norms[normIndex].y);
-                floatArray.push(norms[normIndex].z);
+                if (faceNorm.length > i) {
+                    normIndex = faceNorm[i];
+
+                    floatArray.push(norms[normIndex].x);
+                    floatArray.push(norms[normIndex].y);
+                    floatArray.push(norms[normIndex].z);
+                }
+                else {
+                    floatArray.push(0.0);
+                    floatArray.push(0.0);
+                    floatArray.push(0.0);
+                }
 
                 if(uvIndex >= 0)
                 {
@@ -190,6 +198,8 @@ Character = function (name)
     this.name = name;
     this.models = [];
     this.textures = [];
+
+    this.numTextureLoaded = 0;
 }
 
 Character.prototype.loadOBJ = function(filename)
@@ -215,7 +225,7 @@ Character.prototype.loadOBJ = function(filename)
                 var modelInfo = loadOBJ(lines, verts, norms, uvs, floatArray, lastLine);
                 lastLine = modelInfo[3];
 
-                var model = new Model(modelInfo[4]);
+                var model = new Model(modelInfo[0]);
                 model.floatArray = new Float32Array(floatArray);
                 model.updateVBO();
                 model.numFaces = modelInfo[2];
@@ -373,6 +383,7 @@ Character.prototype.loadTextures = function(textureNames)
             gl.bindTexture(gl.TEXTURE_2D, null);
 
             self.textures[this.index] = this.texture;
+            self.numTextureLoaded += 1;
         }
 
         texture.image.src = textureName;

@@ -37,8 +37,21 @@ function initGL()
         gGun.loadOBJ('zarya_gun.obj');
 
         gCharacter = new Character();
-        gCharacter.loadOBJ('Mercy_Witch.obj');
+        gCharacter.loadOBJ('oldcar.obj');
+        gCharacter.loadTextures([
+            'oldcar_d.png',
+            'oldcar_m.png',
+            'oldcar_r.png',
+            'oldcar_n.png',
+        ]);
 
+        gCharacter.albedo = [0, 0, 0];
+        gCharacter.metalness = [1, 1, 1];
+        gCharacter.roughness = [2, 2, 2];
+        gCharacter.normalMap = [3, 3, 3];
+
+        /*
+        gCharacter.loadOBJ('Mercy_Witch.obj');
         gCharacter.loadTextures([
             'body_d.jpg',
             'eyeball_iris.jpg',
@@ -89,7 +102,7 @@ function initGL()
             10,
             9,
         ]
-
+        */
         gCamera = new Camera(new Vector3(0.0, 3.0, 2.0), new Vector3(0.0, 3.0, -100.0));
 
         document.addEventListener('keydown', onKeyDown);
@@ -276,12 +289,17 @@ function draw()
         var uvAttrib = gl.getAttribLocation(shaderProgram.program, "uv");
         gl.enableVertexAttribArray(uvAttrib);
 
-        var tex0Uniform = gl.getUniformLocation(shaderProgram.program, 'sampler');
+        var tex0Uniform = gl.getUniformLocation(shaderProgram.program, 'environmentSampler');
         var tex1Uniform = gl.getUniformLocation(shaderProgram.program, 'albedoSampler');
-        var tex2Uniform = gl.getUniformLocation(shaderProgram.program, 'roughRefractSampler');
+        var tex2Uniform = gl.getUniformLocation(shaderProgram.program, 'metalnessSampler');
+        var tex3Uniform = gl.getUniformLocation(shaderProgram.program, 'roughnessSampler');
+        var tex4Uniform = gl.getUniformLocation(shaderProgram.program, 'normalSampler');
+
         gl.uniform1i(tex0Uniform, 0);
         gl.uniform1i(tex1Uniform, 1);
         gl.uniform1i(tex2Uniform, 2);
+        gl.uniform1i(tex3Uniform, 3);
+        gl.uniform1i(tex4Uniform, 4);
 
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
@@ -344,10 +362,16 @@ function draw()
             var model = gCharacter.models[i];
 
             gl.activeTexture(gl.TEXTURE0 + 1);
-            gl.bindTexture(gl.TEXTURE_2D, gCharacter.textures[gCharacter.diffuseTextureMappings[i]]);
+            gl.bindTexture(gl.TEXTURE_2D, gCharacter.textures[gCharacter.albedo[i]]);
             
             gl.activeTexture(gl.TEXTURE0 + 2);
-            gl.bindTexture(gl.TEXTURE_2D, gCharacter.textures[gCharacter.pbrMappings[i]]);
+            gl.bindTexture(gl.TEXTURE_2D, gCharacter.textures[gCharacter.metalness[i]]);
+
+            gl.activeTexture(gl.TEXTURE0 + 3);
+            gl.bindTexture(gl.TEXTURE_2D, gCharacter.textures[gCharacter.roughness[i]]);
+
+            gl.activeTexture(gl.TEXTURE0 + 4);
+            gl.bindTexture(gl.TEXTURE_2D, gCharacter.textures[gCharacter.normalMap[i]]);
 
             gl.bindBuffer(gl.ARRAY_BUFFER, model.vbo)
             gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 32, 0);
