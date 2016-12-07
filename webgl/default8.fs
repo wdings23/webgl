@@ -159,6 +159,7 @@ vec3 brdf(vec3 normal, float fRoughness, float fRefract)
 	vec3 tangent = normalize(cross(up, normal));
 	vec3 binormal = normalize(cross(normal, tangent));
 
+	float fTotal = 0.0;
 	float fNDotV = clamp(dot(normal, vView), 0.0, 1.0);
 	for(int i = 0; i < NUM_SAMPLES; i++)
 	{
@@ -167,21 +168,26 @@ vec3 brdf(vec3 normal, float fRoughness, float fRefract)
 		float fVDotH = clamp(dot(vView, halfV), 0.0, 1.0);
 		vec3 lightV = 2.0 * fVDotH * halfV - vView;
 		float fNDotL = clamp(dot(normal, lightV), 0.0, 1.0);
-		float fNDotH = clamp(dot(normal, halfV), 0.0, 1.0);
-		float fLDotH = clamp(dot(lightV, halfV), 0.0, 1.0);
 
-		float fLOD = distribution(fNDotH, fVDotH, fRoughness);
-		vec4 color = textureCube(environmentSampler, lightV, fLOD);
+		if(fNDotL > 0.0) 
+		{
+			float fNDotH = clamp(dot(normal, halfV), 0.0, 1.0);
+			float fLDotH = clamp(dot(lightV, halfV), 0.0, 1.0);
 
-		float fFresnel = fresnel(fVDotH, fRefract);
-		float fGeometry = geometry(fVDotH, fLDotH, fRoughness);
-		float fDenom = 1.0 / (fNDotH * fNDotV);
-		float fBRDF = clamp(fGeometry * fFresnel * fVDotH * fDenom, 0.0, 1.0);
+			float fLOD = distribution(fNDotH, fVDotH, fRoughness);
+			vec4 color = textureCube(environmentSampler, lightV, fLOD);
 
-		ret.xyz += color.xyz * fBRDF;
+			float fFresnel = fresnel(fVDotH, fRefract);
+			float fGeometry = geometry(fVDotH, fLDotH, fRoughness);
+			float fDenom = 1.0 / (fNDotH * fNDotV);
+			float fBRDF = clamp(fGeometry * fFresnel * fVDotH * fDenom, 0.0, 1.0);
+
+			ret.xyz += color.xyz * fBRDF;
+			fTotal += 1.0;
+		}
 	}
 
-	ret.xyz /= float(NUM_SAMPLES);
+	ret.xyz /= fTotal;
 
 	return ret;
 }
@@ -232,7 +238,7 @@ void main()
 	vec3 metal = KSpecular;
 	vec3 color = dielectric * (fMetalVal) + metal * (1.0 - fMetalVal);
 	//gl_FragColor = vec4(dielectric * (1.0 - fMetalVal) + metal * fMetalVal, 1.0) * albedo;
-	gl_FragColor = vec4(KSpecular, 1.0);
+	gl_FragColor = vec4(color, 1.0) * albedo; 
 
 	//vec3 color = diffuse(vNorm) + brdf(vNorm, fRoughness, fRefract);
 	//gl_FragColor = vec4(color, 1.0) * albedo;

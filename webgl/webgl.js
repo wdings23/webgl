@@ -25,6 +25,10 @@ function initGL()
     {
         gl.clearColor(0.0, 0.0, 0.5, 1.0);
         gl.enable(gl.DEPTH_TEST);
+
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
         gl.depthFunc(gl.LEQUAL);
         gl.viewport(0, 0, canvas.width, canvas.height);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
