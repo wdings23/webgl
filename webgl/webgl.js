@@ -9,6 +9,89 @@ var gEnvMap;
 var gBob;
 var gBobInc;
 
+var gaMaterialModels = [];
+
+/*
+**
+*/
+function loadSorceress(character)
+{
+    character.loadOBJ('models/sorceress/sorceress.obj');
+    character.loadTextures([
+        'models/sorceress/Drenai_Body_BaseColor.png',
+        'models/sorceress/Drenai_Body_Metallic.jpg',
+        'models/sorceress/Drenai_Body_Roughness.jpg',
+        'models/sorceress/Drenai_Body_Normal.jpg',
+        'models/sorceress/Drenai_Skirt_BaseColor.jpg',
+        'models/sorceress/Drenai_Skirt_Metallic.jpg',
+        'models/sorceress/Drenai_Skirt_Roughness.jpg',
+        'models/sorceress/Drenai_Skirt_Normal.jpg',
+    ]);
+
+    character.albedo = [0, 4];
+    character.metalness = [1, 5];
+    character.roughness = [2, 6];
+    character.normalMap = [3, 7];
+}
+
+/*
+**
+*/
+function loadCar(character)
+{
+    character.loadOBJ('oldcar.obj');
+    character.loadTextures([
+        'oldcar_d.png',
+        'oldcar_m.png',
+        'oldcar_r.png',
+        'oldcar_n.png',
+    ]);
+
+    character.albedo = [0, 0, 0];
+    character.metalness = [1, 1, 1];
+    character.roughness = [2, 2, 2];
+    character.normalMap = [3, 3, 3];
+}
+
+/*
+**
+*/
+function loadPink(character)
+{
+    character.loadOBJ('models/pink/pink.obj');
+    character.loadTextures([
+       'models/pink/body_albedo_2048.png',
+       'models/pink/body_SPEC_2048.png',
+       'models/pink/body_Roughness_1024.png',
+       'models/pink/body_Normal_DirectX.png',
+    ]);
+
+    character.albedo = [0, 0, 0];
+    character.metalness = [1, 1, 1];
+    character.roughness = [2, 2, 2];
+    character.normalMap = [3, 3, 3];
+}
+
+/*
+**
+*/
+function loadMetal(character, textures)
+{
+    var floatArray = createSphere(1.0, 0, 0, 0, 12);
+    var model = new Model('sphere');
+    model.floatArray = new Float32Array(floatArray);
+    model.updateVBO();
+    model.numFaces = (model.floatArray.length / 9) / 3;
+    character.models.push(model);
+
+    character.loadTextures(textures);
+
+    character.albedo = [0];
+    character.metalness = [1];
+    character.normalMap = [2];
+    character.roughness = [3];
+}
+
 /*
 **
 */
@@ -23,6 +106,9 @@ function initGL()
 
     if (gl)
     {
+        var available_extensions = gl.getSupportedExtensions();
+        var float_texture_ext = gl.getExtension('EXT_shader_texture_lod');
+
         gl.clearColor(0.0, 0.0, 0.5, 1.0);
         gl.enable(gl.DEPTH_TEST);
 
@@ -37,22 +123,78 @@ function initGL()
 
         gShaderManager.readInAllShaders("shaders");
 
-        gGun = new Character();
-        gGun.loadOBJ('zarya_gun.obj');
+        /*var textures = ['materials/greasy-metal-pan1-Unreal-Engine/greasy-metal-pan1-albedo.png',
+         'materials/greasy-metal-pan1-Unreal-Engine/greasy-metal-pan1-metal.png',
+         'materials/greasy-metal-pan1-Unreal-Engine/greasy-metal-pan1-normal.png',
+         'materials/greasy-metal-pan1-Unreal-Engine/greasy-metal-pan1-roughness.png']
+        */
 
-        gCharacter = new Character();
-        gCharacter.loadOBJ('oldcar.obj');
-        gCharacter.loadTextures([
-            'oldcar_d.png',
-            'oldcar_m.png',
-            'oldcar_r.png',
-            'oldcar_n.png',
-        ]);
+        var textures0 = [
+            'materials/iron-rusted4-Unreal-Engine/iron-rusted4-basecolor.png',
+            'materials/iron-rusted4-Unreal-Engine/iron-rusted4-metalness.png',
+            'materials/iron-rusted4-Unreal-Engine/iron-rusted4-normal.png',
+            'materials/iron-rusted4-Unreal-Engine/iron-rusted4-roughness.png'
+        ];
 
-        gCharacter.albedo = [0, 0, 0];
-        gCharacter.metalness = [1, 1, 1];
-        gCharacter.roughness = [2, 2, 2];
-        gCharacter.normalMap = [3, 3, 3];
+        var textures1 = [
+            'materials/greasy-metal-pan1-Unreal-Engine/greasy-metal-pan1-albedo.png',
+            'materials/greasy-metal-pan1-Unreal-Engine/greasy-metal-pan1-metal.png',
+            'materials/greasy-metal-pan1-Unreal-Engine/greasy-metal-pan1-normal.png',
+            'materials/greasy-metal-pan1-Unreal-Engine/greasy-metal-pan1-roughness.png'
+        ];
+
+        var textures2= [
+            'materials/copper-rock1-Unreal-Engine/copper-rock1-alb.png',
+            'materials/copper-rock1-Unreal-Engine/copper-rock1-metal.png',
+            'materials/copper-rock1-Unreal-Engine/copper-rock1-normal.png',
+            'materials/copper-rock1-Unreal-Engine/copper-rock1-rough.png'
+        ];
+
+        var textures3 = [
+            'materials/scuffed-plastic-1-Unreal-Engine/scuffed-plastic6-alb.png',
+            'materials/scuffed-plastic-1-Unreal-Engine/scuffed-plastic-metal.png',
+            'materials/scuffed-plastic-1-Unreal-Engine/scuffed-plastic-normal.png',
+            'materials/scuffed-plastic-1-Unreal-Engine/scuffed-plastic-rough.png'
+        ];
+
+        //gCharacter = new Character();
+
+
+        var materialModel = new Character();
+        loadMetal(materialModel, textures0);
+        gaMaterialModels.push(materialModel);
+        
+        materialModel = new Character();
+        loadMetal(materialModel, textures1);
+        gaMaterialModels.push(materialModel);
+
+        materialModel = new Character();
+        loadMetal(materialModel, textures2);
+        gaMaterialModels.push(materialModel);
+
+        materialModel = new Character();
+        loadMetal(materialModel, textures3);
+        gaMaterialModels.push(materialModel);
+
+        //gGun = new Character();
+        //gGun.loadOBJ('zarya_gun.obj');
+
+        //loadSorceress(gCharacter);
+        //loadCar(gCharacter);
+        //loadPink(gCharacter);
+
+        //gCharacter.loadOBJ('oldcar.obj');
+        //gCharacter.loadTextures([
+        //    'oldcar_d.png',
+        //    'oldcar_m.png',
+        //    'oldcar_r.png',
+        //    'oldcar_n.png',
+        //]);
+
+        //gCharacter.albedo = [0, 0, 0];
+        //gCharacter.metalness = [1, 1, 1];
+        //gCharacter.roughness = [2, 2, 2];
+        //gCharacter.normalMap = [3, 3, 3];
 
         /*
         gCharacter.loadOBJ('Mercy_Witch.obj');
@@ -107,7 +249,7 @@ function initGL()
             9,
         ]
         */
-        gCamera = new Camera(new Vector3(0.0, 3.0, 2.0), new Vector3(0.0, 3.0, -100.0));
+        gCamera = new Camera(new Vector3(0.0, 0.0, -2.0), new Vector3(0.0, 0.0, 100.0));
 
         document.addEventListener('keydown', onKeyDown);
 
@@ -251,11 +393,11 @@ function draw()
     var totalRot = matRotX.multiply(matRotY);
    
     var matTrans = new Matrix44();
-    matTrans.translate(gCamera.position.x - 0.85, (gCamera.position.y - 0.6) + gBob, gCamera.position.z - 1.1);
+    //matTrans.translate(gCamera.position.x - 0.85, (gCamera.position.y - 0.6) + gBob, gCamera.position.z - 1.1);
+    matTrans.translate(0.0, 0.0, 0.0);
     var matModel = matTrans.multiply(totalRot);
     
     var totalMat = gCamera.matrix.multiply(matModel);
-    var model = gCharacter.models[0];
     var componentCount = 0;
     var count = 0;
 
@@ -309,11 +451,7 @@ function draw()
 
         var stride = 3 * Float32Array.BYTES_PER_ELEMENT;
 
-        // matrix uniforms
-        if (modelMatrixUniform)
-        {
-            gl.uniformMatrix4fv(modelMatrixUniform, false, new Float32Array(matModel.entries));
-        }
+        
 
         if (viewMatrixUniform)
         {
@@ -338,16 +476,16 @@ function draw()
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, gEnvMap);
         gl.activeTexture(gl.TEXTURE0);
 
-        // model
-        for (var i = 0; i < gGun.models.length; i++)
-        {
-            var model = gGun.models[i];
-            gl.bindBuffer(gl.ARRAY_BUFFER, model.vbo)
-            gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 32, 0);
-            gl.vertexAttribPointer(normalAttrib, 3, gl.FLOAT, false, 32, stride);
-            gl.vertexAttribPointer(uvAttrib, 2, gl.FLOAT, false, 32, stride + stride);
-            gl.drawArrays(gl.TRIANGLES, 0, model.numFaces * 3);
-        }
+        //// model
+        //for (var i = 0; i < gGun.models.length; i++)
+        //{
+        //    var model = gGun.models[i];
+        //    gl.bindBuffer(gl.ARRAY_BUFFER, model.vbo)
+        //    gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 32, 0);
+        //    gl.vertexAttribPointer(normalAttrib, 3, gl.FLOAT, false, 32, stride);
+        //    gl.vertexAttribPointer(uvAttrib, 2, gl.FLOAT, false, 32, stride + stride);
+        //    gl.drawArrays(gl.TRIANGLES, 0, model.numFaces * 3);
+        //}
 
         // character
         var identity = new Matrix44();
@@ -361,7 +499,53 @@ function draw()
             gl.uniformMatrix4fv(normalMatrixUniform, false, new Float32Array(identity.entries));
         }
 
-        for (var i = 0; i < gCharacter.models.length; i++)
+        for (var i = 0; i < gaMaterialModels.length; i++)
+        {
+            var materialModel = gaMaterialModels[i];
+
+            var matRotY = new Matrix44();
+            matRotY.rotateY(3.14159 * 1.87);
+
+            var matRotX = new Matrix44();
+            matRotX.rotateX(0.15);
+
+            var totalRot = matRotX.multiply(matRotY);
+
+            var matTrans = new Matrix44();
+            matTrans.translate(i * 3.0, 0.0, 0.0);
+            var matModel = matTrans.multiply(totalRot);
+
+            // matrix uniforms
+            if (modelMatrixUniform)
+            {
+                gl.uniformMatrix4fv(modelMatrixUniform, false, new Float32Array(matModel.entries));
+            }
+
+            for(var j = 0; j < materialModel.models.length; j++)
+            {
+                var model = materialModel.models[j];
+
+                gl.activeTexture(gl.TEXTURE0 + 1);
+                gl.bindTexture(gl.TEXTURE_2D, materialModel.textures[materialModel.albedo[j]]);
+
+                gl.activeTexture(gl.TEXTURE0 + 2);
+                gl.bindTexture(gl.TEXTURE_2D, materialModel.textures[materialModel.metalness[j]]);
+
+                gl.activeTexture(gl.TEXTURE0 + 3);
+                gl.bindTexture(gl.TEXTURE_2D, materialModel.textures[materialModel.roughness[j]]);
+
+                gl.activeTexture(gl.TEXTURE0 + 4);
+                gl.bindTexture(gl.TEXTURE_2D, materialModel.textures[materialModel.normalMap[j]]);
+
+                gl.bindBuffer(gl.ARRAY_BUFFER, model.vbo)
+                gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 32, 0);
+                gl.vertexAttribPointer(normalAttrib, 3, gl.FLOAT, false, 32, stride);
+                gl.vertexAttribPointer(uvAttrib, 2, gl.FLOAT, false, 32, stride + stride);
+                gl.drawArrays(gl.TRIANGLES, 0, model.floatArray.length / 8);
+            }
+        }
+
+        /*for (var i = 0; i < gCharacter.models.length; i++)
         {
             var model = gCharacter.models[i];
 
@@ -381,8 +565,9 @@ function draw()
             gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 32, 0);
             gl.vertexAttribPointer(normalAttrib, 3, gl.FLOAT, false, 32, stride);
             gl.vertexAttribPointer(uvAttrib, 2, gl.FLOAT, false, 32, stride + stride);
-            gl.drawArrays(gl.TRIANGLES, 0, model.numFaces * 3);
-        }   
+            gl.drawArrays(gl.TRIANGLES, 0, model.floatArray.length / 8);
+          
+        }   */
     }
 }
 
@@ -485,4 +670,167 @@ function getSampleCoords(numSamples)
     }
 
     return ret;
+}
+
+/*
+**
+*/
+function createSphere(radius, centerX, centerY, centerZ, numSegments)
+{
+    var circlePos = [];
+    
+    var twoPI = Math.PI * 2.0;
+
+    var inc = (2.0 * Math.PI) / numSegments;
+    for (var i = 0; i < numSegments; i++)
+    {
+        var x = Math.cos(inc * i);
+        var z = Math.sin(inc * i);
+
+        circlePos.push(new Vector3(x, 0.0, z));
+    }
+
+    var vertPos = [];
+    var vertUV = [];
+    var vertNorm = [];
+    var halfPI = Math.PI / 2;
+
+    var halfSegments = numSegments / 2;
+    for (var i = 0; i < numSegments; i++)
+    {
+        var nextIndexI = (i + 1) % numSegments;
+
+        var topRadius = (i / halfSegments) * halfPI;
+        var bottomRadius = ((i + 1) / halfSegments) * halfPI;
+
+        if (i >= halfSegments)
+        {
+            topRadius = ((numSegments - i) / halfSegments) * halfPI;
+            bottomRadius = ((numSegments - (i + 1)) / halfSegments) * halfPI;
+        }
+
+        topRadius = Math.sin(topRadius) * radius;
+        bottomRadius = Math.sin(bottomRadius) * radius;
+
+        console.log('top radius ' + topRadius + ' bottom radius ' + bottomRadius);
+
+        var topNormY = Math.cos((i / numSegments) * Math.PI);
+        var bottomNormY = Math.cos(((i + 1) / numSegments) * Math.PI);
+
+        console.log('*********** ' + i + ' ***********');
+
+        for(var j = 0; j < numSegments; j++)
+        {
+            var nextIndexJ = (j + 1) % numSegments;
+            var yMult = 1.0;
+            if (i + 1 >= numSegments)
+            {
+                yMult = -1.0;
+            }
+
+            var topX0 = topRadius * circlePos[j].x;
+            var topY0 = ((halfSegments - i) / halfSegments) * halfPI;
+            var topZ0 = topRadius * circlePos[j].z;
+
+            var topX1 = topRadius * circlePos[nextIndexJ].x;
+            var topY1 = ((halfSegments - i) / halfSegments) * halfPI;
+            var topZ1 = topRadius * circlePos[nextIndexJ].z;
+
+            var bottomX0 = bottomRadius * circlePos[j].x;
+            var bottomY0 = ((halfSegments - nextIndexI) / halfSegments) * halfPI * yMult;
+            var bottomZ0 = bottomRadius * circlePos[j].z;
+
+            var bottomX1 = bottomRadius * circlePos[nextIndexJ].x;
+            var bottomY1 = ((halfSegments - nextIndexI) / halfSegments) * halfPI * yMult;
+            var bottomZ1 = bottomRadius * circlePos[nextIndexJ].z;
+
+            topY0 = Math.sin(topY0);
+            topY1 = Math.sin(topY1);
+            bottomY0 = Math.sin(bottomY0);
+            bottomY1 = Math.sin(bottomY1);
+
+            // 0 --- 2
+            // |  / |
+            // |/ _ |
+            // 1    3
+
+            // face
+            // position
+            vertPos.push(new Vector3(topX0, topY0, topZ0));
+            vertPos.push(new Vector3(bottomX0, bottomY0, bottomZ0));
+            vertPos.push(new Vector3(topX1, topY1, topZ1));
+
+            vertPos.push(new Vector3(topX1, topY1, topZ1));
+            vertPos.push(new Vector3(bottomX0, bottomY0, bottomZ0));
+            vertPos.push(new Vector3(bottomX1, bottomY1, bottomZ1));
+
+            //console.log('0 (' + topX0 + ', ' + topY0 + ', ' + topZ0 + ')');
+            //console.log('1 (' + topX0 + ', ' + bottomY0 + ', ' + topZ0 + ')');
+            //console.log('2 (' + topX1 + ', ' + topY1 + ', ' + topZ1 + ')');
+            //console.log('3 (' + bottomX1 + ', ' + bottomY1 + ', ' + bottomZ1 + ')');
+
+            // normal
+            var topNorm0 = new Vector3(circlePos[j].x * topRadius, topNormY, circlePos[j].z * topRadius);
+            var topNorm1 = new Vector3(circlePos[nextIndexJ].x * topRadius, topNormY, circlePos[nextIndexJ].z * topRadius);
+
+            var bottomNorm0 = new Vector3(circlePos[j].x * bottomRadius, bottomNormY, circlePos[j].z * bottomRadius);
+            var bottomNorm1 = new Vector3(circlePos[nextIndexJ].x * bottomRadius, bottomNormY, circlePos[nextIndexJ].z * bottomRadius);
+
+            topNorm0.normalize();
+            topNorm1.normalize();
+            bottomNorm0.normalize();
+            bottomNorm1.normalize();
+
+            vertNorm.push(topNorm0);
+            vertNorm.push(bottomNorm0);
+            vertNorm.push(topNorm1);
+
+            vertNorm.push(topNorm1);
+            vertNorm.push(bottomNorm0);
+            vertNorm.push(bottomNorm1);
+
+            // uv
+            var dTop0 = new Vector3(topX0, topY0, topZ0);
+            var dTop1 = new Vector3(topX1, topY1, topZ1);
+            dTop0.normalize();
+            dTop1.normalize();
+
+            var dBottom0 = new Vector3(bottomX0, bottomY0, bottomZ0);
+            var dBottom1 = new Vector3(bottomX1, bottomY1, bottomZ1);
+            dBottom0.normalize();
+            dBottom1.normalize();
+
+            var topUV0 = new Vector3(0.5 + Math.atan2(dTop0.z, dTop0.x) / twoPI, 0.5 - Math.asin(dTop0.y) / Math.PI, 0.0);
+            var topUV1 = new Vector3(0.5 + Math.atan2(dTop1.z, dTop1.x) / twoPI, 0.5 - Math.asin(dTop1.y) / Math.PI, 0.0);
+
+            var bottomUV0 = new Vector3(0.5 + Math.atan2(dBottom0.z, dBottom0.x) / twoPI, 0.5 - Math.asin(dBottom0.y) / Math.PI, 0.0);
+            var bottomUV1 = new Vector3(0.5 + Math.atan2(dBottom1.z, dBottom1.x) / twoPI, 0.5 - Math.asin(dBottom1.y) / Math.PI, 0.0);
+
+            vertUV.push(topUV0);
+            vertUV.push(bottomUV0);
+            vertUV.push(topUV1);
+
+            vertUV.push(topUV1);
+            vertUV.push(bottomUV0);
+            vertUV.push(bottomUV1);
+        }
+    }
+
+    // to number array
+    var floatArray = [];
+    for (var i = 0; i < vertPos.length; i++)
+    {
+        floatArray.push(vertPos[i].x);
+        floatArray.push(vertPos[i].y);
+        floatArray.push(vertPos[i].z);
+
+        floatArray.push(vertNorm[i].x);
+        floatArray.push(vertNorm[i].y);
+        floatArray.push(vertNorm[i].z);
+
+        floatArray.push(vertUV[i].x);
+        floatArray.push(vertUV[i].y);
+    }
+
+    return floatArray;
 }

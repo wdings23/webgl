@@ -1,3 +1,5 @@
+#extension GL_EXT_shader_texture_lod : enable
+
 #define NUM_SAMPLES 128
 
 precision highp float;
@@ -236,9 +238,12 @@ void main()
 	vec3 KSpecular = brdf(worldSpaceNormal3, fRoughness, fRefract);
 	vec3 dielectric = KDiffuse + KSpecular;
 	vec3 metal = KSpecular;
-	vec3 color = dielectric * (fMetalVal) + metal * (1.0 - fMetalVal);
-	//gl_FragColor = vec4(dielectric * (1.0 - fMetalVal) + metal * fMetalVal, 1.0) * albedo;
-	gl_FragColor = vec4(color, 1.0) * albedo; 
+	vec3 color = dielectric * (1.0 - fMetalVal) + metal * (fMetalVal);
+	//gl_FragColor = vec4(color, 1.0) * albedo; 
+	//gl_FragColor = albedo;
+	//gl_FragColor = vec4(vNorm * 0.5 + 0.5, 1.0);
+
+	gl_FragColor = textureCubeLodEXT(environmentSampler, vNorm.xyz, 2.0);
 
 	//vec3 color = diffuse(vNorm) + brdf(vNorm, fRoughness, fRefract);
 	//gl_FragColor = vec4(color, 1.0) * albedo;
