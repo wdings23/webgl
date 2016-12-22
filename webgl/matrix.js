@@ -11,6 +11,15 @@ Matrix44 = function()
     ];
 }
 
+Matrix44.prototype.copy = function(matrix)
+{
+    this.entries = [];
+    for(var i = 0; i < 16; i++)
+    {
+        this.entries.push(matrix.entries[i]);
+    }
+}
+
 Matrix44.prototype.identity = function ()
 {
     this.entries =

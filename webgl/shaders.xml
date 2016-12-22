@@ -1,7 +1,22 @@
 ﻿<shaders>
   <program>
-    <name>flat</name>
-    <vertex>default8.vs</vertex>
-    <fragment>default8.fs</fragment>
+    <name>default</name>
+    <vertex>default.vs</vertex>
+    <fragment>default.fs</fragment>
+  </program>
+  <program>
+    <name>pbr</name>
+    <vertex>pbr.vs</vertex>
+    <fragment>pbr.fs</fragment>
+  </program>
+  <program>
+    <name>mrt</name>
+    <vertex>mrt.vs</vertex>
+    <fragment>mrt.fs</fragment>
+  </program>
+  <program>
+    <name>texture</name>
+    <vertex>texture.vs</vertex>
+    <fragment>texture.fs</fragment>
   </program>
 </shaders>

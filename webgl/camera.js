@@ -13,9 +13,12 @@ Camera.prototype.update = function(up, far, near, width, height)
     var lookAt = this.lookAt.subtract(this.position);
     lookAt.normalize();
 
+    var zAxis = lookAt;
     var xAxis = up.cross(lookAt);
-    var zAxis = xAxis.cross(up);
+    xAxis.normalize();
+
     var yAxis = zAxis.cross(xAxis);
+    yAxis.normalize();
 
     var rotMatrix = new Matrix44();
 
@@ -56,5 +59,5 @@ Camera.prototype.update = function(up, far, near, width, height)
     var mat = this.projectionMatrix.transpose();
     this.projectionMatrix = mat;
 
-    this.matrix = this.projectionMatrix.multiply(this.viewMatrix);
+    //this.matrix = this.projectionMatrix.multiply(this.viewMatrix);
 }
