@@ -19,4 +19,9 @@
     <vertex>texture.vs</vertex>
     <fragment>texture.fs</fragment>
   </program>
+  <program>
+    <name>mrt_pbr</name>
+    <vertex>mrt_pbr.vs</vertex>
+    <fragment>mrt_pbr.fs</fragment>
+  </program>
 </shaders>

@@ -90,6 +90,7 @@ function compileShaderProgram(shaderManager, programName, vertexSrc, fragmentSrc
             else
             {
                 console.log("Error: " + gl.getShaderInfoLog(vertexShader));
+                debugger;
             }
 
             if (vertexShader && fragmentShader)
@@ -123,6 +124,7 @@ function compileShaderProgram(shaderManager, programName, vertexSrc, fragmentSrc
             else
             {
                 console.log("Error: " + gl.getShaderInfoLog(fragmentShader));
+                debugger;
             }
 
             if (vertexShader && fragmentShader)
@@ -152,6 +154,8 @@ function linkShaderProgram(shaderManager, programName, vertexShader, fragmentSha
         var error = gl.getProgramInfoLog(program);
         console.log("Error in program linking: " + error);
         gl.deleteProgram(program);
+
+        debugger;
     }
     else
     {

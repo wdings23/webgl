@@ -144,8 +144,6 @@ function initGL()
         var diffX = event.movementX;
         var diffY = event.movementY;
 
-        console.log('diff = ' + diffX + ', ' + diffY);
-
         var speedMultiplier = 0.005;
 
         var rotMatrixX = new Matrix44();
@@ -156,8 +154,6 @@ function initGL()
 
         var incX = (diffX * speedMultiplier) / (Math.PI * 2.0);
         var incY = (diffY * speedMultiplier) / (Math.PI * 0.5);
-
-        console.log('inc = ' + incX + ', ' + incY);
 
         gLookAngleX += incX;
         gLookAngleY += incY;
@@ -186,10 +182,12 @@ function initGL()
     if (gl)
     {
         [gMRTFramebuffer, gMRTTextures]  = createFBTextures();
-        gaMRTQuadBuffer.push(createQuad(0.4, -1.0, 0.6));
-        gaMRTQuadBuffer.push(createQuad(0.4, -0.2, 0.6));
-        gaMRTQuadBuffer.push(createQuad(0.4, 0.4, 0.6));
-        gaMRTQuadBuffer.push(createQuad(0.4, 0.8, 0.6));
+        gaMRTQuadBuffer.push(createQuad(0.4, -1.4, 0.3));
+        gaMRTQuadBuffer.push(createQuad(0.4, -0.9, 0.3));
+        gaMRTQuadBuffer.push(createQuad(0.4, -0.4, 0.3));
+        gaMRTQuadBuffer.push(createQuad(0.4, 0.1, 0.3));
+        gaMRTQuadBuffer.push(createQuad(0.4, 0.6, 0.3));
+        gaMRTQuadBuffer.push(createQuad(0.4, 1.1, 0.3));
 
         var available_extensions = gl.getSupportedExtensions();
         var float_texture_ext = gl.getExtension('EXT_shader_texture_lod');
@@ -441,7 +439,6 @@ function handleKeyboard()
 function onKeyDown(event)
 {
     gKeydown[event.key] = true;
-    console.log('event = ' + event.key);
 }
 
 /*
@@ -833,12 +830,8 @@ function createSphere(radius, centerX, centerY, centerZ, numSegments)
         topRadius = Math.sin(topRadius) * radius;
         bottomRadius = Math.sin(bottomRadius) * radius;
 
-        console.log('top radius ' + topRadius + ' bottom radius ' + bottomRadius);
-
         var topNormY = Math.cos((i / numSegments) * Math.PI);
         var bottomNormY = Math.cos(((i + 1) / numSegments) * Math.PI);
-
-        console.log('*********** ' + i + ' ***********');
 
         for(var j = 0; j < numSegments; j++)
         {
@@ -1059,7 +1052,7 @@ function createFBTextures()
 
     var frameBuffer = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
-    var mrtTextures = new Array(4);
+    var mrtTextures = new Array(6);
 
     for (var i = 0; i < mrtTextures.length; i++) {
         var texture = gl.createTexture();
@@ -1092,6 +1085,8 @@ function createFBTextures()
         drawBuffersEXT.COLOR_ATTACHMENT1_WEBGL,
         drawBuffersEXT.COLOR_ATTACHMENT2_WEBGL,
         drawBuffersEXT.COLOR_ATTACHMENT3_WEBGL,
+        drawBuffersEXT.COLOR_ATTACHMENT4_WEBGL,
+        drawBuffersEXT.COLOR_ATTACHMENT5_WEBGL,
     ]);
 
     for (var i = 0; i < 100; i++)
@@ -1165,10 +1160,12 @@ function drawMRT(shaderName)
         var tex0Uniform = gl.getUniformLocation(shaderProgram.program, 'albedoSampler');
         var tex1Uniform = gl.getUniformLocation(shaderProgram.program, 'metalnessSampler');
         var tex2Uniform = gl.getUniformLocation(shaderProgram.program, 'roughnessSampler');
+        var tex3Uniform = gl.getUniformLocation(shaderProgram.program, 'normalSampler');
         
         gl.uniform1i(tex0Uniform, 0);
         gl.uniform1i(tex1Uniform, 1);
         gl.uniform1i(tex2Uniform, 2);
+        gl.uniform1i(tex3Uniform, 3);
         
         var stride = 3 * Float32Array.BYTES_PER_ELEMENT;
         if (viewMatrixUniform) {
@@ -1226,6 +1223,9 @@ function drawMRT(shaderName)
                 gl.activeTexture(gl.TEXTURE0 + 2);
                 gl.bindTexture(gl.TEXTURE_2D, materialModel.textures[materialModel.roughness[j]]);
 
+                gl.activeTexture(gl.TEXTURE0 + 3);
+                gl.bindTexture(gl.TEXTURE_2D, materialModel.textures[materialModel.normalMap[j]]);
+
                 gl.bindBuffer(gl.ARRAY_BUFFER, model.vbo)
                 gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 32, 0);
                 gl.vertexAttribPointer(normalAttrib, 3, gl.FLOAT, false, 32, stride);
@@ -1245,49 +1245,50 @@ function drawMRT(shaderName)
 function createQuad(size, offsetX, offsetY)
 {
     var vert = [];
+    var halfSize = size * 0.5;
 
-    vert.push(size + offsetX);
-    vert.push(size + offsetY);
+    vert.push(halfSize + offsetX);
+    vert.push(halfSize + offsetY);
     vert.push(0.0);
     vert.push(1.0);
 
     vert.push(1.0);
     vert.push(1.0);
 
-    vert.push(-size + offsetX);
-    vert.push(-size + offsetY);
+    vert.push(-halfSize + offsetX);
+    vert.push(-halfSize + offsetY);
     vert.push(0.0);
     vert.push(1.0);
 
     vert.push(0.0);
     vert.push(0.0);
 
-    vert.push(size + offsetX);
-    vert.push(-size + offsetY);
+    vert.push(halfSize + offsetX);
+    vert.push(-halfSize + offsetY);
     vert.push(0.0);
     vert.push(1.0);
 
     vert.push(1.0);
     vert.push(0.0);
 
-    vert.push(-size + offsetX);
-    vert.push(size + offsetY);
+    vert.push(-halfSize + offsetX);
+    vert.push(halfSize + offsetY);
     vert.push(0.0);
     vert.push(1.0);
 
     vert.push(0.0);
     vert.push(1.0);
 
-    vert.push(-size + offsetX);
-    vert.push(-size + offsetY);
+    vert.push(-halfSize + offsetX);
+    vert.push(-halfSize + offsetY);
     vert.push(0.0);
     vert.push(1.0);
 
     vert.push(0.0);
     vert.push(0.0);
 
-    vert.push(size + offsetX);
-    vert.push(size + offsetY);
+    vert.push(halfSize + offsetX);
+    vert.push(halfSize + offsetY);
     vert.push(0.0);
     vert.push(1.0);
 
