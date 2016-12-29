@@ -222,7 +222,7 @@ SpecularOut brdf(vec3 normal, float fRoughness, float fRefract)
 
 	float fTotal = 0.0;
 	float fNDotV = clamp(dot(normal, vView), 0.0, 1.0);
-	for(int i = 0; i < NUM_SAMPLES; i++)
+	/*for(int i = 0; i < NUM_SAMPLES; i++)
 	{
 		vec3 halfV = importanceSampleGGX(afSamplePos[i], fRoughness, normal, tangent, binormal);
 		
@@ -254,7 +254,9 @@ SpecularOut brdf(vec3 normal, float fRoughness, float fRefract)
 	ret.xyz /= float(NUM_SAMPLES);
 
 	specularOut.color /= fTotal;
-	specularOut.fresnel /= fTotal;
+	specularOut.fresnel /= fTotal;*/
+
+	specularOut.color = vView;
 
 	return specularOut;
 }
@@ -306,8 +308,8 @@ void main()
 	vec3 dielectric = KDiffuse;
 	vec3 metal = KSpecular;
 	vec3 color = dielectric * (1.0 - fMetalVal) + metal * (fMetalVal);
-	gl_FragColor = vec4(color, 1.0) * albedo; 
-	//gl_FragColor = vec4(KSpecular, 1.0);
+	//gl_FragColor = vec4(color, 1.0) * albedo; 
+	gl_FragColor = vec4(KSpecular, 1.0);
 	
 	//gl_FragColor = textureCube(environmentSampler, vNorm.xyz, 2.0);
 

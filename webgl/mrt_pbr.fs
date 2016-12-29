@@ -7,8 +7,8 @@ uniform sampler2D		normalMap;
 uniform sampler2D		clipSpaceMap;
 uniform sampler2D		worldSpaceMap;
 uniform sampler2D		albedoMap;
-uniform sampler2D		metalRoughnessMap;
 uniform sampler2D		normalSampler;
+uniform sampler2D		metalRoughnessMap;
 
 uniform vec2			afSamplePos[NUM_SAMPLES];
 uniform vec3			eyePos;
@@ -17,7 +17,7 @@ varying vec2			vUV;
 
 float fImageDimension = 128.0;
 float fOneOverPI = 1.0 / 3.14159;
-float gfTextureMult = 1.5;
+float gfTextureMult = 1.0;
 
 struct SpecularOut
 {
@@ -261,12 +261,31 @@ SpecularOut brdf(vec3 normal, float fRoughness, float fRefract, vec3 view)
 */
 void main()
 {
+	/*uniform samplerCube		environmentSampler;
+	uniform sampler2D		normalMap;
+	uniform sampler2D		clipSpaceMap;
+	uniform sampler2D		worldSpaceMap;
+	uniform sampler2D		albedoMap;
+	uniform sampler2D		metalRoughnessMap;
+	uniform sampler2D		normalSampler;
+	*/
+
+	//gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+	//gl_FragColor = texture2D(normalSampler, vUV);
+	
+
 	vec4 clipSpace = texture2D(clipSpaceMap, vUV);
 	vec4 albedo = texture2D(albedoMap, vUV);
 	vec4 normal = texture2D(normalMap, vUV);
 	vec4 metalRoughness = texture2D(metalRoughnessMap, vUV);
 	vec4 normalColor = texture2D(normalSampler, vUV) * 2.0 - 1.0;
 	vec4 worldPos = texture2D(worldSpaceMap, vUV);
+
+	if(normal.w <= 0.0)
+	{
+		gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);
+		return;
+	}
 
 	float fRoughness = metalRoughness.x;
 	float fMetalVal = metalRoughness.y;
@@ -291,14 +310,23 @@ void main()
 	vec4 worldSpaceNormal = worldSpaceMat * normalColor;
 	vec3 worldSpaceNormal3 = vec3(worldSpaceNormal.xyz);
 
-	vec3 view = worldPos.xyz - eyePos;
+	//vec4 lightDir = vec4(1.0, 1.0, 1.0, 1.0);
+	//lightDir = normalize(lightDir);
+	//float fDP = dot(worldSpaceNormal, lightDir);
+	//gl_FragColor = vec4(fDP, fDP, fDP, 1.0);
+	//gl_FragColor.xyz = normal.xyz;
+	//gl_FragColor.w = 1.0;
 
-	vec3 KDiffuse = diffuse2(worldSpaceNormal3);//diffuse(worldSpaceNormal3);
+	vec3 KDiffuse = diffuse2(worldSpaceNormal3);
+
+	vec3 view = normalize(eyePos - worldPos.xyz);
 	SpecularOut specularOut = brdf(worldSpaceNormal3, fRoughness, fRefract, view);
 	vec3 KSpecular = specularOut.color;
 
+	//gl_FragColor = vec4(KSpecular, 1.0);
+
 	vec3 dielectric = KDiffuse;
 	vec3 metal = KSpecular;
-	vec3 color = dielectric * (1.0 - fMetalVal) + metal * (fMetalVal);
+	vec3 color = dielectric * (fMetalVal) + metal * (1.0 - fMetalVal);
 	gl_FragColor = vec4(color, 1.0) * albedo; 
 }
