@@ -17,7 +17,9 @@ void main()
 	vNorm = normMatrix * vec4(normal, 1.0);
 	vWorldPos = modelMatrix * vec4(position, 1.0);
 	vUV = vec4(uv.xy, 0.0, 1.0);
-	vClipSpacePos = projMatrix * viewMatrix * modelMatrix * vec4(position, 1.0);
+	vec4 clipSpace = projMatrix * viewMatrix * modelMatrix * vec4(position, 1.0);
 
-	gl_Position = vClipSpacePos;
+	vClipSpacePos = clipSpace;
+
+	gl_Position = clipSpace;
 }

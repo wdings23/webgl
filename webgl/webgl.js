@@ -17,6 +17,13 @@ var gMRTFramebuffer;
 var gaMRTQuadBuffer = [];
 var gDepthTexture;
 var gMRTFinalQuadBuffer;
+var gLightViewFrameBuffer;
+var gLightViewTexture;
+var gLightViewQuadBuffer;
+var gLightViewCamera;
+
+var gLightViewFrameBuffer = null;
+var gGround = {vbo: null, textures: null};
 
 var MRTEnum =
 {
@@ -204,15 +211,29 @@ function initGL()
 
     if (gl)
     {
-        [gMRTFramebuffer, gaMRTTextures, gDepthTexture]  = createFBTextures();
-        gaMRTQuadBuffer.push(createQuad(0.4, -1.4, 0.3));
-        gaMRTQuadBuffer.push(createQuad(0.4, -0.9, 0.3));
-        gaMRTQuadBuffer.push(createQuad(0.4, -0.4, 0.3));
-        gaMRTQuadBuffer.push(createQuad(0.4, 0.1, 0.3));
-        gaMRTQuadBuffer.push(createQuad(0.4, 0.6, 0.3));
-        gaMRTQuadBuffer.push(createQuad(0.4, 1.1, 0.3));
+        [gMRTFramebuffer, gaMRTTextures, gDepthTexture] = createFBTextures();
+        [gLightViewFrameBuffer, gLightViewTexture] = createLightViewFrameBuffer();
+
+        gaMRTQuadBuffer.push(createQuad(0.4, -1.4, -0.5));
+        gaMRTQuadBuffer.push(createQuad(0.4, -0.9, -0.5));
+        gaMRTQuadBuffer.push(createQuad(0.4, -0.4, -0.5));
+        gaMRTQuadBuffer.push(createQuad(0.4, 0.1, -0.5));
+        gaMRTQuadBuffer.push(createQuad(0.4, 0.6, -0.5));
+        gaMRTQuadBuffer.push(createQuad(0.4, 1.1, -0.5));
+        
+        gLightViewQuadBuffer = createQuad(1.5, 0.0, 0.5);
 
         gMRTFinalQuadBuffer = createQuad(2.0, 0.0, 0.0);
+
+        var groundBuffer = createGround(10.0, 0.0, -3.0, 0.0);
+        gGround.vbo = groundBuffer;
+        (function createGroundTextures() {
+            createTextures2(['ground_albedo.jpeg', 'ground_metallic.jpeg', 'ground_roughness.jpeg', 'ground_normal.jpeg'],
+                function (textures) {
+                    gGround.textures = textures;
+                });
+                
+        })();
 
         var available_extensions = gl.getSupportedExtensions();
         var float_texture_ext = gl.getExtension('EXT_shader_texture_lod');
@@ -233,14 +254,6 @@ function initGL()
         gShaderManager = new ShaderManager();
 
         gShaderManager.readInAllShaders("shaders");
-
-        gCrossHairShader = gShaderManager.getShaderProgram("default");
-
-        /*var textures = ['materials/greasy-metal-pan1-Unreal-Engine/greasy-metal-pan1-albedo.png',
-         'materials/greasy-metal-pan1-Unreal-Engine/greasy-metal-pan1-metal.png',
-         'materials/greasy-metal-pan1-Unreal-Engine/greasy-metal-pan1-normal.png',
-         'materials/greasy-metal-pan1-Unreal-Engine/greasy-metal-pan1-roughness.png']
-        */
 
         var textures0 = [
             'materials/iron-rusted4-Unreal-Engine/iron-rusted4-basecolor.png',
@@ -363,6 +376,8 @@ function initGL()
         ]
         */
         gCamera = new Camera(new Vector3(0.0, 0.0, -6.0), new Vector3(0.0, 0.0, 100.0));
+        //gCamera = new Camera(new Vector3(5.0, 10.0, 5.0), new Vector3(0.0, 0.0, 0.0));
+        gLightViewCamera = new Camera(new Vector3(5.0, 10.0, 5.0), new Vector3(0.0, 0.0, 0.0));
 
         window.setInterval(handleKeyboard, 16);
         window.addEventListener('keydown', onKeyDown);
@@ -492,7 +507,14 @@ function createVBO(vertPos)
 function tick()
 {
     requestAnimationFrame(tick);
+    if (!gShaderManager.finishLoading())
+    {
+        return;
+    }
+
     update();
+    drawFromLight();
+
     drawMRT('mrt');
     //draw();
     drawMRTFinal();
@@ -537,22 +559,22 @@ function draw()
     var componentCount = 0;
     var count = 0;
 
-    var shaderProgram = gShaderManager.getShaderProgram("pbr");
-    if (shaderProgram)
+    var shader = gShaderManager.getShaderProgram("pbr");
+    if (shader)
     {
-        gl.useProgram(shaderProgram.program);
+        gl.useProgram(shader.program);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
         // uniforms
-        var colorUniform = gl.getUniformLocation(shaderProgram.program, "color");
-        var modelMatrixUniform = gl.getUniformLocation(shaderProgram.program, "modelMatrix");
-        var viewMatrixUniform = gl.getUniformLocation(shaderProgram.program, 'viewMatrix');
-        var projectionMatrixUniform = gl.getUniformLocation(shaderProgram.program, 'projMatrix');
-        var normalMatrixUniform = gl.getUniformLocation(shaderProgram.program, 'normMatrix');
-        var lightPosUniform = gl.getUniformLocation(shaderProgram.program, 'lightPos');
+        var colorUniform = gl.getUniformLocation(shader.program, "color");
+        var modelMatrixUniform = gl.getUniformLocation(shader.program, "modelMatrix");
+        var viewMatrixUniform = gl.getUniformLocation(shader.program, 'viewMatrix');
+        var projectionMatrixUniform = gl.getUniformLocation(shader.program, 'projMatrix');
+        var normalMatrixUniform = gl.getUniformLocation(shader.program, 'normMatrix');
+        var lightPosUniform = gl.getUniformLocation(shader.program, 'lightPos');
 
-        var sampleCoordUniform = gl.getUniformLocation(shaderProgram.program, 'afSamplePos');
-        var eyeCoordUniform = gl.getUniformLocation(shaderProgram.program, 'eyePos');
+        var sampleCoordUniform = gl.getUniformLocation(shader.program, 'afSamplePos');
+        var eyeCoordUniform = gl.getUniformLocation(shader.program, 'eyePos');
 
         var samplePos = getSampleCoords(128);
         gl.uniform2fv(sampleCoordUniform, new Float32Array(samplePos));
@@ -563,20 +585,20 @@ function draw()
         gl.uniform4fv(lightPosUniform, new Float32Array(lightPos));
 
         // attribs (position and normal)
-        var vertexAttrib = gl.getAttribLocation(shaderProgram.program, "position");
+        var vertexAttrib = gl.getAttribLocation(shader.program, "position");
         gl.enableVertexAttribArray(vertexAttrib);
 
-        var normalAttrib = gl.getAttribLocation(shaderProgram.program, "normal");
+        var normalAttrib = gl.getAttribLocation(shader.program, "normal");
         gl.enableVertexAttribArray(normalAttrib);
 
-        var uvAttrib = gl.getAttribLocation(shaderProgram.program, "uv");
+        var uvAttrib = gl.getAttribLocation(shader.program, "uv");
         gl.enableVertexAttribArray(uvAttrib);
 
-        var tex0Uniform = gl.getUniformLocation(shaderProgram.program, 'environmentSampler');
-        var tex1Uniform = gl.getUniformLocation(shaderProgram.program, 'albedoSampler');
-        var tex2Uniform = gl.getUniformLocation(shaderProgram.program, 'metalnessSampler');
-        var tex3Uniform = gl.getUniformLocation(shaderProgram.program, 'roughnessSampler');
-        var tex4Uniform = gl.getUniformLocation(shaderProgram.program, 'normalSampler');
+        var tex0Uniform = gl.getUniformLocation(shader.program, 'environmentSampler');
+        var tex1Uniform = gl.getUniformLocation(shader.program, 'albedoSampler');
+        var tex2Uniform = gl.getUniformLocation(shader.program, 'metalnessSampler');
+        var tex3Uniform = gl.getUniformLocation(shader.program, 'roughnessSampler');
+        var tex4Uniform = gl.getUniformLocation(shader.program, 'normalSampler');
 
         gl.uniform1i(tex0Uniform, 0);
         gl.uniform1i(tex1Uniform, 1);
@@ -686,6 +708,9 @@ function draw()
         for (var i = 0; i < gaMRTQuadBuffer.length; i++) {
             drawQuad(gaMRTQuadBuffer[i], gaMRTTextures[i]);
         }
+
+        drawQuad(gLightViewQuadBuffer, gLightViewTexture);
+
         gl.enable(gl.DEPTH_TEST);
 
         /*for (var i = 0; i < gCharacter.models.length; i++)
@@ -1067,6 +1092,66 @@ function drawCrossHair(buffer, numLinePts)
 /*
 **
 */
+function createLightViewFrameBuffer()
+{
+    var drawBuffersEXT = gl.getExtension('WEBGL_draw_buffers');
+    var floatingPointTextureEXT = gl.getExtension('OES_texture_float');
+    var canvas = document.getElementById('glcanvas');
+
+    if (floatingPointTextureEXT == null || drawBuffersEXT == null) {
+        debugger;
+    }
+
+    var oldFB = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+
+    var frameBuffer = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
+
+    var texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        canvas.width,
+        canvas.height,
+        0,
+        gl.RGBA,
+        gl.FLOAT,
+        null);
+
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, drawBuffersEXT.COLOR_ATTACHMENT0_WEBGL, gl.TEXTURE_2D, texture, 0);
+
+    var depthRenderBuffer = gl.createRenderbuffer();
+    gl.bindRenderbuffer(gl.RENDERBUFFER, depthRenderBuffer);
+    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, canvas.width, canvas.height);
+    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depthRenderBuffer);
+
+    drawBuffersEXT.drawBuffersWEBGL([drawBuffersEXT.COLOR_ATTACHMENT0_WEBGL]);
+    for (var i = 0; i < 100; i++) {
+        var status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+        console.log('status = ' + status);
+        if (status == gl.FRAMEBUFFER_COMPLETE) {
+            break;
+        }
+        else {
+            debugger;
+        }
+    }
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, oldFB);
+    gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+
+    return [frameBuffer, texture];
+}
+
+/*
+**
+*/
 function createFBTextures()
 {
     console.log(gl.getSupportedExtensions());
@@ -1184,30 +1269,30 @@ function drawMRT(shaderName)
     var componentCount = 0;
     var count = 0;
 
-    var shaderProgram = gShaderManager.getShaderProgram(shaderName);
-    if (shaderProgram)
+    var shader = gShaderManager.getShaderProgram(shaderName);
+    if (shader)
     {
-        gl.useProgram(shaderProgram.program);
+        gl.useProgram(shader.program);
 
         // uniforms
-        var modelMatrixUniform = gl.getUniformLocation(shaderProgram.program, "modelMatrix");
-        var viewMatrixUniform = gl.getUniformLocation(shaderProgram.program, 'viewMatrix');
-        var projectionMatrixUniform = gl.getUniformLocation(shaderProgram.program, 'projMatrix');
-        var normalMatrixUniform = gl.getUniformLocation(shaderProgram.program, 'normMatrix');
+        var modelMatrixUniform = gl.getUniformLocation(shader.program, "modelMatrix");
+        var viewMatrixUniform = gl.getUniformLocation(shader.program, 'viewMatrix');
+        var projectionMatrixUniform = gl.getUniformLocation(shader.program, 'projMatrix');
+        var normalMatrixUniform = gl.getUniformLocation(shader.program, 'normMatrix');
 
         // vertex attribs (position and normal)
-        var vertexAttrib = gl.getAttribLocation(shaderProgram.program, "position");
-        var normalAttrib = gl.getAttribLocation(shaderProgram.program, "normal");
-        var uvAttrib = gl.getAttribLocation(shaderProgram.program, "uv");
+        var vertexAttrib = gl.getAttribLocation(shader.program, "position");
+        var normalAttrib = gl.getAttribLocation(shader.program, "normal");
+        var uvAttrib = gl.getAttribLocation(shader.program, "uv");
 
         gl.enableVertexAttribArray(vertexAttrib);
         gl.enableVertexAttribArray(normalAttrib);
         gl.enableVertexAttribArray(uvAttrib);
 
-        var tex0Uniform = gl.getUniformLocation(shaderProgram.program, 'albedoSampler');
-        var tex1Uniform = gl.getUniformLocation(shaderProgram.program, 'metalnessSampler');
-        var tex2Uniform = gl.getUniformLocation(shaderProgram.program, 'roughnessSampler');
-        var tex3Uniform = gl.getUniformLocation(shaderProgram.program, 'normalSampler');
+        var tex0Uniform = gl.getUniformLocation(shader.program, 'albedoSampler');
+        var tex1Uniform = gl.getUniformLocation(shader.program, 'metalnessSampler');
+        var tex2Uniform = gl.getUniformLocation(shader.program, 'roughnessSampler');
+        var tex3Uniform = gl.getUniformLocation(shader.program, 'normalSampler');
         
         gl.uniform1i(tex0Uniform, 0);
         gl.uniform1i(tex1Uniform, 1);
@@ -1287,8 +1372,38 @@ function drawMRT(shaderName)
                 gl.vertexAttribPointer(uvAttrib, 2, gl.FLOAT, false, 32, stride + stride);
                 gl.drawArrays(gl.TRIANGLES, 0, model.floatArray.length / 8);
             }
-        }
-    }
+
+        }   // for i = 0 to num models
+
+        // ground
+        (function drawGround()
+        {
+            if (gGround.textures == null)
+            {
+                return;
+            }
+
+            var stride = 3 * Float32Array.BYTES_PER_ELEMENT;
+            for (var i = 0; i < gGround.textures.length; i++)
+            {
+                gl.activeTexture(gl.TEXTURE0 + i);
+                gl.bindTexture(gl.TEXTURE_2D, gGround.textures[i]);
+            }
+
+            // vertex attribs (position and normal)
+            var vertexAttrib = gl.getAttribLocation(shader.program, "position");
+            var normalAttrib = gl.getAttribLocation(shader.program, "normal");
+            var uvAttrib = gl.getAttribLocation(shader.program, "uv");
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, gGround.vbo)
+            gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 32, 0);
+            gl.vertexAttribPointer(normalAttrib, 3, gl.FLOAT, false, 32, stride);
+            gl.vertexAttribPointer(uvAttrib, 2, gl.FLOAT, false, 32, stride + stride);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+        })();
+
+    }   // if valid shader 
 
     gl.clearColor(0.0, 0.0, 0.5, 1.0);
     gl.bindFramebuffer(gl.FRAMEBUFFER, oldFB);
@@ -1361,6 +1476,87 @@ function createQuad(size, offsetX, offsetY)
 /*
 **
 */
+function createGround(size, offsetX, offsetY, offsetZ) {
+    var vert = [];
+    var halfSize = size * 0.5;
+
+    vert.push(halfSize + offsetX);
+    vert.push(offsetY);
+    vert.push(halfSize + offsetZ);
+    
+    vert.push(0.0);
+    vert.push(1.0);
+    vert.push(0.0);
+
+    vert.push(1.0);
+    vert.push(1.0);
+
+    vert.push(-halfSize + offsetX);
+    vert.push(offsetY);
+    vert.push(-halfSize + offsetZ);
+    
+    vert.push(0.0);
+    vert.push(1.0);
+    vert.push(0.0);
+
+    vert.push(0.0);
+    vert.push(0.0);
+
+    vert.push(halfSize + offsetX);
+    vert.push(offsetY);
+    vert.push(-halfSize + offsetZ);
+    
+    vert.push(0.0);
+    vert.push(1.0);
+    vert.push(0.0);
+
+    vert.push(1.0);
+    vert.push(0.0);
+
+    vert.push(-halfSize + offsetX);
+    vert.push(offsetY);
+    vert.push(halfSize + offsetZ);
+    
+    vert.push(0.0);
+    vert.push(1.0);
+    vert.push(0.0);
+
+    vert.push(0.0);
+    vert.push(1.0);
+
+    vert.push(-halfSize + offsetX);
+    vert.push(offsetY);
+    vert.push(-halfSize + offsetZ);
+    
+    vert.push(0.0);
+    vert.push(1.0);
+    vert.push(0.0);
+
+    vert.push(0.0);
+    vert.push(0.0);
+
+    vert.push(halfSize + offsetX);
+    vert.push(offsetY);
+    vert.push(halfSize + offsetZ);
+    
+    vert.push(0.0);
+    vert.push(1.0);
+    vert.push(0.0);
+
+    vert.push(1.0);
+    vert.push(1.0);
+
+    var buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vert), gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+    return buffer;
+}
+
+/*
+**
+*/
 function drawQuad(quadBuffer, texture)
 {
     var shader = gShaderManager.getShaderProgram('texture');
@@ -1370,13 +1566,13 @@ function drawQuad(quadBuffer, texture)
         gl.useProgram(shader.program);
 
         // vertex attribs (position and normal)
-        var vertexAttrib = gl.getAttribLocation(shaderProgram.program, "position");
-        var uvAttrib = gl.getAttribLocation(shaderProgram.program, "uv");
+        var vertexAttrib = gl.getAttribLocation(shader.program, "position");
+        var uvAttrib = gl.getAttribLocation(shader.program, "uv");
 
         gl.enableVertexAttribArray(vertexAttrib);
         gl.enableVertexAttribArray(uvAttrib);
 
-        var tex0Uniform = gl.getUniformLocation(shaderProgram.program, 'textureMap');
+        var tex0Uniform = gl.getUniformLocation(shader.program, 'textureMap');
         gl.uniform1i(tex0Uniform, 0);
 
         gl.activeTexture(gl.TEXTURE0);
@@ -1403,19 +1599,25 @@ function drawMRTFinal(quadBuffer)
     {
         gl.useProgram(shader.program);
 
+        // light view camera matrix
+        var lightViewMatrixUniform = gl.getUniformLocation(shader.program, 'lightViewMatrix');
+        var lightProjectionMatrixUniform = gl.getUniformLocation(shader.program, 'lightProjectionMatrix');
+        gl.uniformMatrix4fv(lightViewMatrixUniform, false, new Float32Array(gLightViewCamera.viewMatrix.entries));
+        gl.uniformMatrix4fv(lightProjectionMatrixUniform, false, new Float32Array(gLightViewCamera.projectionMatrix.entries));
+
         // sampling and eye coordinates uniforms
-        var sampleCoordUniform = gl.getUniformLocation(shaderProgram.program, 'afSamplePos');
-        var eyeCoordUniform = gl.getUniformLocation(shaderProgram.program, 'eyePos');
+        var sampleCoordUniform = gl.getUniformLocation(shader.program, 'afSamplePos');
+        var eyeCoordUniform = gl.getUniformLocation(shader.program, 'eyePos');
 
         var samplePos = getSampleCoords(128);
         gl.uniform2fv(sampleCoordUniform, new Float32Array(samplePos));
         gl.uniform3f(eyeCoordUniform, gCamera.position.x, gCamera.position.y, gCamera.position.z);
 
         // attribs (position and uv)
-        var vertexAttrib = gl.getAttribLocation(shaderProgram.program, "position");
+        var vertexAttrib = gl.getAttribLocation(shader.program, "position");
         gl.enableVertexAttribArray(vertexAttrib);
 
-        var uvAttrib = gl.getAttribLocation(shaderProgram.program, "uv");
+        var uvAttrib = gl.getAttribLocation(shader.program, "uv");
         gl.enableVertexAttribArray(uvAttrib);
 
         var samplerNames =
@@ -1432,9 +1634,12 @@ function drawMRTFinal(quadBuffer)
         // texture map samplers
         var uniforms = [];
         for (var i = 0; i < samplerNames.length; i++) {
-            uniforms.push(gl.getUniformLocation(shaderProgram.program, samplerNames[i]));
+            uniforms.push(gl.getUniformLocation(shader.program, samplerNames[i]));
             gl.uniform1i(uniforms[i], i);
         }
+
+        var lightViewUniform  = gl.getUniformLocation(shader.program, 'lightViewDepthMap');
+        gl.uniform1i(lightViewUniform, samplerNames.length);
 
         //var MRTEnum =
         //{
@@ -1455,6 +1660,9 @@ function drawMRTFinal(quadBuffer)
             gl.bindTexture(gl.TEXTURE_2D, gaMRTTextures[i]);
         }
 
+        gl.activeTexture(gl.TEXTURE0 + samplerNames.length);
+        gl.bindTexture(gl.TEXTURE_2D, gLightViewTexture);
+
         var stride = 4 * Float32Array.BYTES_PER_ELEMENT;
         var vertexSize = (4 + 2) * Float32Array.BYTES_PER_ELEMENT;
 
@@ -1466,6 +1674,15 @@ function drawMRTFinal(quadBuffer)
 
         gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
+
+    gl.disable(gl.DEPTH_TEST);
+    drawCrossHair(gCrossHairInfo[0], gCrossHairInfo[1]);
+    for (var i = 0; i < gaMRTQuadBuffer.length; i++) {
+        drawQuad(gaMRTQuadBuffer[i], gaMRTTextures[i]);
+    }
+
+    drawQuad(gLightViewQuadBuffer, gLightViewTexture);
+    gl.enable(gl.DEPTH_TEST);
 }
 
 /*
@@ -1496,4 +1713,176 @@ function createDepthTexture(width, height) {
     }
 
     return depthTexture;
+}
+
+/*
+**
+*/
+function createTextures2(textureNames, callBack)
+{
+    var textures = new Array(textureNames.length);
+    var numTextureLoaded = 0;
+    for (var i = 0; i < textureNames.length; i++) {
+        var textureName = textureNames[i];
+
+        var texture = gl.createTexture();
+        texture.image = new Image();
+        texture.image.texture = texture;
+        texture.image.onload = function () {
+            gl.bindTexture(gl.TEXTURE_2D, this.texture);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texImage2D(
+                gl.TEXTURE_2D,
+                0,
+                gl.RGBA,
+                gl.RGBA,
+                gl.UNSIGNED_BYTE,
+                this);
+
+            gl.bindTexture(gl.TEXTURE_2D, null);
+
+            // place in array
+            for (var j = 0; j < textureNames.length; j++)
+            {
+                if(this.src.indexOf(textureNames[j]) == this.src.length - textureNames[j].length)
+                {
+                    textures[j] = this.texture;
+                    break;
+                }
+            }
+            
+            numTextureLoaded += 1;
+
+            if (numTextureLoaded >= textureNames.length)
+            {
+                callBack(textures);
+            }
+        }
+
+        texture.image.src = textureName;
+        texture.image.index = i;
+    }
+}
+
+/*
+**
+*/
+function drawFromLight()
+{
+    gl.enable(gl.CULL_FACE);
+    gl.cullFace(gl.BACK);
+
+    var oldFB = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, gLightViewFrameBuffer);
+
+    var shader = gShaderManager.getShaderProgram('shadowmap');
+    if (shader == null) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, oldFB);
+        return;
+    }
+
+    gl.useProgram(shader.program);
+
+    var matRotY = new Matrix44();
+    matRotY.rotateY(3.14159 * 1.87);
+
+    var matRotX = new Matrix44();
+    matRotX.rotateX(0.15);
+
+    var totalRot = matRotX.multiply(matRotY);
+
+    var matTrans = new Matrix44();
+    matTrans.translate(0.0, 0.0, 0.0);
+    var matModel = matTrans.multiply(totalRot);
+
+    var componentCount = 0;
+    var count = 0;
+
+    if (shader) {
+        gl.useProgram(shader.program);
+
+        // uniforms
+        var modelMatrixUniform = gl.getUniformLocation(shader.program, "modelMatrix");
+        var viewMatrixUniform = gl.getUniformLocation(shader.program, 'viewMatrix');
+        var projectionMatrixUniform = gl.getUniformLocation(shader.program, 'projMatrix');
+        
+        // vertex attribs (position and normal)
+        var vertexAttrib = gl.getAttribLocation(shader.program, "position");
+
+        gl.enableVertexAttribArray(vertexAttrib);
+
+gLightViewCamera.position.x -= 0.01;
+
+        var up = new Vector3(0.0, 1.0, 0.0);
+        var lookAt = gLightViewCamera.lookAt.subtract(gCamera.position);
+        lookAt.normalize();
+        if (Math.abs(lookAt.y) >= 0.9999) {
+            up.x = 0.0; up.y = 0.0; up.z = 1.0;
+        }
+
+        gLightViewCamera.update(up, 50.0, 1.0, 500.0, 500.0);
+
+        var stride = 3 * Float32Array.BYTES_PER_ELEMENT;
+        if (viewMatrixUniform) {
+            gl.uniformMatrix4fv(viewMatrixUniform, false, new Float32Array(gLightViewCamera.viewMatrix.entries));
+        }
+
+        if (projectionMatrixUniform) {
+            gl.uniformMatrix4fv(projectionMatrixUniform, false, new Float32Array(gLightViewCamera.projectionMatrix.entries));
+        }
+
+        gl.clearColor(0.0, 0.0, 0.0, 0.0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        for (var i = 0; i < gaMaterialModels.length; i++) {
+            var materialModel = gaMaterialModels[i];
+
+            var matRotY = new Matrix44();
+            var matRotX = new Matrix44();
+            matRotY.rotateY(Math.PI * 1.87);
+            matRotX.rotateX(0.15);
+
+            var totalRot = matRotX.multiply(matRotY);
+            var matTrans = new Matrix44();
+
+            var posX = ((i - gaMaterialModels.length / 2) + i) * 1.5;
+
+            matTrans.translate(posX, 0.0, 0.0);
+            var matModel = matTrans.multiply(totalRot);
+
+            // matrix uniforms
+            if (modelMatrixUniform) {
+                gl.uniformMatrix4fv(modelMatrixUniform, false, new Float32Array(matModel.entries));
+            }
+
+            // set texture and draw
+            for (var j = 0; j < materialModel.models.length; j++) {
+                var model = materialModel.models[j];
+
+                gl.bindBuffer(gl.ARRAY_BUFFER, model.vbo)
+                gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 32, 0);
+                gl.drawArrays(gl.TRIANGLES, 0, model.floatArray.length / 8);
+            }
+
+        }   // for i = 0 to num models
+
+        // ground
+        (function drawGround() {
+            
+            // vertex attribs (position and normal)
+            var vertexAttrib = gl.getAttribLocation(shader.program, "position");
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, gGround.vbo)
+            gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 32, 0);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+        })();
+
+    }   // if valid shader 
+
+    gl.clearColor(0.0, 0.0, 0.5, 1.0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, oldFB);
 }

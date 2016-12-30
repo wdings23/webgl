@@ -18,7 +18,11 @@ varying vec4 vWorldPos;
 void main()
 {
 	gl_FragData[0] = vNorm;
-	gl_FragData[1] = vClipSpacePos;
+	gl_FragData[1].x = vClipSpacePos.x / vClipSpacePos.w;
+	gl_FragData[1].y = vClipSpacePos.y / vClipSpacePos.w;
+	gl_FragData[1].z = vClipSpacePos.z / vClipSpacePos.w;
+	gl_FragData[1].w = 1.0;
+
 	gl_FragData[2] = vWorldPos;
 	gl_FragData[3] = texture2D(albedoSampler, vUV.xy);
 	gl_FragData[4] = texture2D(normalSampler, vUV.xy);

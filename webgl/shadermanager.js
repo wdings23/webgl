@@ -4,6 +4,7 @@ ShaderProgram = function (name, vertexShader, fragmentShader, program)
     this.vertexShader = vertexShader;
     this.fragmentShader = fragmentShader;
     this.program = program;
+    this.numShadersToLoad = 0;
 }
 
 ShaderManager = function ()
@@ -41,10 +42,13 @@ ShaderManager.prototype.readInAllShaders = function (shaderHTMLID)
     client.onreadystatechange = function () {
         if (client.readyState == 4 && client.status == 200) {
             // read in the string from file
-            console.log(client.responseText);
+            //console.log(client.responseText);
+
             var parser = new DOMParser();
             var xmlDoc = parser.parseFromString(client.responseText, "text/xml");
             var programNodes = xmlDoc.getElementsByTagName("program");
+            shaderManager.numShadersToLoad = programNodes.length;
+
             for (var i = 0; i < programNodes.length; i++)
             {
                 var nameNode = programNodes[i].getElementsByTagName("name")[0];
@@ -69,6 +73,14 @@ ShaderManager.prototype.readInAllShaders = function (shaderHTMLID)
     client.send();
 }
 
+/*
+**
+*/
+ShaderManager.prototype.finishLoading = function()
+{
+    return (this.shaders.length >= this.numShadersToLoad);
+}
+
 function compileShaderProgram(shaderManager, programName, vertexSrc, fragmentSrc)
 {
     // get the shader file as new http request
@@ -79,7 +91,7 @@ function compileShaderProgram(shaderManager, programName, vertexSrc, fragmentSrc
         if (vertexClient.readyState == 4 && vertexClient.status == 200)
         {
             // compile the shader
-            console.log(vertexClient.responseText);
+            //console.log(vertexClient.responseText);
             vertexShader = gl.createShader(gl.VERTEX_SHADER);
             gl.shaderSource(vertexShader, vertexClient.responseText);
             gl.compileShader(vertexShader);
@@ -113,7 +125,7 @@ function compileShaderProgram(shaderManager, programName, vertexSrc, fragmentSrc
         if (fragmentClient.readyState == 4 && fragmentClient.status == 200)
         {
             // compile
-            console.log(fragmentClient.responseText);
+            //console.log(fragmentClient.responseText);
             fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
             gl.shaderSource(fragmentShader, fragmentClient.responseText);
             gl.compileShader(fragmentShader);
@@ -162,5 +174,11 @@ function linkShaderProgram(shaderManager, programName, vertexShader, fragmentSha
         // register the shader program with the manager
         shaderProgram = new ShaderProgram(programName, vertexShader, fragmentShader, program);
         shaderManager.addShaderProgram(shaderProgram);
+
+        console.log('added ' + programName);
     }
 }
+
+/*
+**
+*/

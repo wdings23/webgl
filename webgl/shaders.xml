@@ -24,4 +24,9 @@
     <vertex>mrt_pbr.vs</vertex>
     <fragment>mrt_pbr.fs</fragment>
   </program>
+  <program>
+    <name>shadowmap</name>
+    <vertex>shadowmap.vs</vertex>
+    <fragment>shadowmap.fs</fragment>
+  </program>
 </shaders>

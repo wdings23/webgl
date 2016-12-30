@@ -9,15 +9,19 @@ uniform sampler2D		worldSpaceMap;
 uniform sampler2D		albedoMap;
 uniform sampler2D		normalSampler;
 uniform sampler2D		metalRoughnessMap;
+uniform sampler2D		lightViewDepthMap;
 
 uniform vec2			afSamplePos[NUM_SAMPLES];
 uniform vec3			eyePos;
+
+uniform mat4			lightViewMatrix;
+uniform mat4			lightProjectionMatrix;
 
 varying vec2			vUV;
 
 float fImageDimension = 128.0;
 float fOneOverPI = 1.0 / 3.14159;
-float gfTextureMult = 1.0;
+float gfTextureMult = 1.2;
 
 struct SpecularOut
 {
@@ -259,6 +263,35 @@ SpecularOut brdf(vec3 normal, float fRoughness, float fRefract, vec3 view)
 /*
 **
 */
+vec4 inShadow(vec4 worldPos)
+{
+	vec4 lightSpacePos = lightProjectionMatrix * lightViewMatrix * worldPos;
+
+	float fX = lightSpacePos.x / lightSpacePos.w;
+	float fY = lightSpacePos.y / lightSpacePos.w;
+	float fU = fX * 0.5 + 0.5;
+	float fV = (fY * 0.5 + 0.5);
+
+	vec2 lightSpaceUV = vec2(fU, fV);
+	vec4 depth = texture2D(lightViewDepthMap, lightSpaceUV);
+	
+	float fCurrDepth = lightSpacePos.z / lightSpacePos.w;
+	float fDiff = abs(fCurrDepth - depth.x);
+	vec4 color = vec4(1.0, 1.0, 1.0, 1.0);
+
+	if(depth.x <= fCurrDepth - 0.0005)
+	{
+		color.x = 0.2;
+		color.y = 0.2;
+		color.z = 0.2;
+	}
+
+	return color;
+}
+
+/*
+**
+*/
 void main()
 {
 	/*uniform samplerCube		environmentSampler;
@@ -329,4 +362,7 @@ void main()
 	vec3 metal = KSpecular;
 	vec3 color = dielectric * (fMetalVal) + metal * (1.0 - fMetalVal);
 	gl_FragColor = vec4(color, 1.0) * albedo; 
+
+	//gl_FragColor *= inShadow(vUV, worldPos);
+	gl_FragColor = inShadow(worldPos);
 }
