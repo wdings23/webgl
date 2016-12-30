@@ -263,6 +263,27 @@ SpecularOut brdf(vec3 normal, float fRoughness, float fRefract, vec3 view)
 /*
 **
 */
+float chebyshevUpperBound(vec2 moments, float fDistance)
+{
+	const float fMinVariance = 0.00001;
+
+	if(fDistance <= moments.x)
+	{
+		return 1.0;
+	}
+
+	float fVariance = moments.y - (moments.x * moments.x);
+	fVariance = max(fVariance, fMinVariance);
+
+	float fD = fDistance - moments.x;
+	float fPMax = fVariance / (fVariance + fD * fD);
+
+	return fPMax;
+}
+
+/*
+**
+*/
 vec4 inShadow(vec4 worldPos)
 {
 	const float fSampleSpread = 0.0005;
@@ -287,11 +308,15 @@ vec4 inShadow(vec4 worldPos)
 
 			vec2 lightSpaceUV = vec2(fU, fV);
 			vec4 depth = texture2D(lightViewDepthMap, lightSpaceUV);
-	
 			float fCurrDepth = lightSpacePos.z / lightSpacePos.w;
-			float fDiff = abs(fCurrDepth - depth.x);
-		
-			if(depth.x <= fCurrDepth - 0.0005)
+			
+			vec2 moments = vec2(depth.x, depth.y);
+			float fContrib = chebyshevUpperBound(moments, fCurrDepth);
+			totalColor.x += fContrib;
+			totalColor.y += fContrib;
+			totalColor.z += fContrib;
+
+			/*if(depth.x <= fCurrDepth - 0.0005)
 			{
 				totalColor.x += 0.3;
 				totalColor.y += 0.3;
@@ -302,7 +327,7 @@ vec4 inShadow(vec4 worldPos)
 				totalColor.x += 1.0;
 				totalColor.y += 1.0;
 				totalColor.z += 1.0;
-			}
+			}*/
 
 			fTotalSamples += 1.0;
 		}

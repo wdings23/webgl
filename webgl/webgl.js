@@ -211,6 +211,8 @@ function initGL()
 
     if (gl)
     {
+        gl.getExtension("OES_standard_derivatives");
+
         [gMRTFramebuffer, gaMRTTextures, gDepthTexture] = createFBTextures();
         [gLightViewFrameBuffer, gLightViewTexture] = createLightViewFrameBuffer();
 
@@ -221,11 +223,11 @@ function initGL()
         gaMRTQuadBuffer.push(createQuad(0.4, 0.6, -0.5));
         gaMRTQuadBuffer.push(createQuad(0.4, 1.1, -0.5));
         
-        gLightViewQuadBuffer = createQuad(1.5, 0.0, 0.5);
+        gLightViewQuadBuffer = createQuad(0.4, -1.4, 0.5);
 
         gMRTFinalQuadBuffer = createQuad(2.0, 0.0, 0.0);
 
-        var groundBuffer = createGround(10.0, 0.0, -3.0, 0.0);
+        var groundBuffer = createGround(20.0, 0.0, -3.0, 0.0);
         gGround.vbo = groundBuffer;
         (function createGroundTextures() {
             createTextures2(['ground_albedo.jpeg', 'ground_metallic.jpeg', 'ground_roughness.jpeg', 'ground_normal.jpeg'],
@@ -1772,9 +1774,6 @@ function createTextures2(textureNames, callBack)
 */
 function drawFromLight()
 {
-    gl.enable(gl.CULL_FACE);
-    gl.cullFace(gl.BACK);
-
     var oldFB = gl.getParameter(gl.FRAMEBUFFER_BINDING);
     gl.bindFramebuffer(gl.FRAMEBUFFER, gLightViewFrameBuffer);
 
@@ -1785,6 +1784,8 @@ function drawFromLight()
     }
 
     gl.useProgram(shader.program);
+
+    gl.cullFace(gl.FRONT);
 
     var matRotY = new Matrix44();
     matRotY.rotateY(3.14159 * 1.87);
@@ -1885,4 +1886,6 @@ gLightViewCamera.position.z += 0.01;
 
     gl.clearColor(0.0, 0.0, 0.5, 1.0);
     gl.bindFramebuffer(gl.FRAMEBUFFER, oldFB);
+
+    gl.cullFace(gl.BACK);
 }

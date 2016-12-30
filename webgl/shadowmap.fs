@@ -1,4 +1,5 @@
 #extension GL_EXT_draw_buffers : require
+#extension GL_OES_standard_derivatives : enable
 
 precision highp float;
 
@@ -6,9 +7,13 @@ varying vec4 vClipSpacePos;
 
 void main()
 {
-	float fX = vClipSpacePos.x / vClipSpacePos.w;
-	float fY = vClipSpacePos.y / vClipSpacePos.w;
-	float fZ = vClipSpacePos.z / vClipSpacePos.w;
+	float fDepth = vClipSpacePos.z / vClipSpacePos.w;
+	float fDepthSquared = fDepth * fDepth;
+	
+	float fDX = dFdx(fDepth);
+	float fDY = dFdy(fDepth);
+	float fMoment2 = fDepthSquared + 0.25 * (fDX * fDX + fDY * fDY);
 
-	gl_FragData[0] = vec4(fZ, fZ, fZ, 1.0);
+
+	gl_FragData[0] = vec4(fDepth, fMoment2, 0.0, 1.0);
 }
