@@ -265,28 +265,52 @@ SpecularOut brdf(vec3 normal, float fRoughness, float fRefract, vec3 view)
 */
 vec4 inShadow(vec4 worldPos)
 {
+	const float fSampleSpread = 0.0005;
+	const float fSampleRate = 0.002;
+
 	vec4 lightSpacePos = lightProjectionMatrix * lightViewMatrix * worldPos;
 
 	float fX = lightSpacePos.x / lightSpacePos.w;
 	float fY = lightSpacePos.y / lightSpacePos.w;
-	float fU = fX * 0.5 + 0.5;
-	float fV = (fY * 0.5 + 0.5);
-
-	vec2 lightSpaceUV = vec2(fU, fV);
-	vec4 depth = texture2D(lightViewDepthMap, lightSpaceUV);
 	
-	float fCurrDepth = lightSpacePos.z / lightSpacePos.w;
-	float fDiff = abs(fCurrDepth - depth.x);
-	vec4 color = vec4(1.0, 1.0, 1.0, 1.0);
-
-	if(depth.x <= fCurrDepth - 0.0005)
+	vec4 totalColor = vec4(0.0, 0.0, 0.0, 1.0);
+	float fTotalSamples = 0.0;
+	for(float i = -fSampleRate; i <= fSampleRate; i += fSampleSpread)
 	{
-		color.x = 0.2;
-		color.y = 0.2;
-		color.z = 0.2;
+		for(float j = -fSampleRate; j <= fSampleRate; j += fSampleSpread)
+		{
+			float fOffsetX = fX + i;
+			float fOffsetY = fY + j;
+
+			float fU = fOffsetX * 0.5 + 0.5;
+			float fV = fOffsetY * 0.5 + 0.5;
+
+			vec2 lightSpaceUV = vec2(fU, fV);
+			vec4 depth = texture2D(lightViewDepthMap, lightSpaceUV);
+	
+			float fCurrDepth = lightSpacePos.z / lightSpacePos.w;
+			float fDiff = abs(fCurrDepth - depth.x);
+		
+			if(depth.x <= fCurrDepth - 0.0005)
+			{
+				totalColor.x += 0.3;
+				totalColor.y += 0.3;
+				totalColor.z += 0.3;
+			}
+			else
+			{
+				totalColor.x += 1.0;
+				totalColor.y += 1.0;
+				totalColor.z += 1.0;
+			}
+
+			fTotalSamples += 1.0;
+		}
 	}
 
-	return color;
+	totalColor.xyz /= fTotalSamples;
+
+	return totalColor;
 }
 
 /*
@@ -363,6 +387,6 @@ void main()
 	vec3 color = dielectric * (fMetalVal) + metal * (1.0 - fMetalVal);
 	gl_FragColor = vec4(color, 1.0) * albedo; 
 
-	//gl_FragColor *= inShadow(vUV, worldPos);
+	//gl_FragColor *= inShadow(worldPos);
 	gl_FragColor = inShadow(worldPos);
 }

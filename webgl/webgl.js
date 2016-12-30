@@ -1814,7 +1814,7 @@ function drawFromLight()
 
         gl.enableVertexAttribArray(vertexAttrib);
 
-gLightViewCamera.position.x -= 0.01;
+gLightViewCamera.position.z += 0.01;
 
         var up = new Vector3(0.0, 1.0, 0.0);
         var lookAt = gLightViewCamera.lookAt.subtract(gCamera.position);
