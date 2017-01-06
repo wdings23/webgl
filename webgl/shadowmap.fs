@@ -7,7 +7,7 @@ varying vec4 vClipSpacePos;
 
 void main()
 {
-	float fDepth = vClipSpacePos.z / vClipSpacePos.w;
+	float fDepth = (vClipSpacePos.z / vClipSpacePos.w) * 0.5 + 0.5;
 	float fDepthSquared = fDepth * fDepth;
 	
 	float fDX = dFdx(fDepth);

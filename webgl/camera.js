@@ -5,6 +5,7 @@ Camera = function(pos, lookAt)
     this.matrix = new Matrix44();
     this.projectionType = 0;
     this.viewMatrix = new Matrix44();
+    this.rotMatrix = null;
     this.projectionMatrix = new Matrix44();
 }
 
@@ -33,6 +34,8 @@ Camera.prototype.update = function(up, far, near, width, height)
     rotMatrix.entries[2] = zAxis.x;
     rotMatrix.entries[6] = zAxis.y;
     rotMatrix.entries[10] = zAxis.z;
+
+    this.rotMatrix = rotMatrix;
 
     var transMatrix = new Matrix44();
     transMatrix.entries[12] = -this.position.x;

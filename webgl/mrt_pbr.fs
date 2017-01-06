@@ -13,6 +13,7 @@ uniform sampler2D		lightViewDepthMap;
 
 uniform vec2			afSamplePos[NUM_SAMPLES];
 uniform vec3			eyePos;
+uniform vec3			lookDir;
 
 uniform mat4			lightViewMatrix;
 uniform mat4			lightProjectionMatrix;
@@ -21,7 +22,7 @@ varying vec2			vUV;
 
 float fImageDimension = 128.0;
 float fOneOverPI = 1.0 / 3.14159;
-float gfTextureMult = 1.2;
+float gfTextureMult = 1.0;
 
 struct SpecularOut
 {
@@ -145,11 +146,12 @@ vec3 diffuse(vec3 normal)
 		{
 			vec4 color = textureCube(environmentSampler, lightV, 0.0);
 			ret.xyz += color.xyz;
-			fTotal += 1.0;
 		}	
+
+		fTotal += 1.0;
 	}
 
-	ret.xyz /= (fTotal * 3.14159);
+	ret.xyz /= fTotal;
 	return ret;
 }
 
@@ -210,8 +212,6 @@ SpecularOut brdf(vec3 normal, float fRoughness, float fRefract, vec3 view)
 	specularOut.color = vec3(0.0, 0.0, 0.0);
 	specularOut.fresnel = 0.0;
 
-	vec3 ret = vec3(0.0, 0.0, 0.0);
-
 	vec3 up = vec3(0.0, 0.0, 1.0);
 	if(normal.z >= 0.9999)
 	{
@@ -221,38 +221,42 @@ SpecularOut brdf(vec3 normal, float fRoughness, float fRefract, vec3 view)
 	vec3 tangent = normalize(cross(up, normal));
 	vec3 binormal = normalize(cross(normal, tangent));
 
+	vec3 normalizedView = normalize(view);
+
 	float fTotal = 0.0;
-	float fNDotV = clamp(dot(normal, view), 0.0, 1.0);
+	float fNDotV = clamp(dot(normal, normalizedView), 0.0, 1.0);
 	for(int i = 0; i < NUM_SAMPLES; i++)
 	{
-		vec3 halfV = importanceSampleGGX(afSamplePos[i], fRoughness, normal, tangent, binormal);
-		
-		float fVDotH = clamp(dot(view, halfV), 0.0, 1.0);
-		vec3 lightV = 2.0 * fVDotH * halfV - view;
-		float fNDotL = clamp(dot(normal, lightV), 0.0, 1.0);
+		vec3 sampleV = importanceSampleGGX(afSamplePos[i], fRoughness, normal, tangent, binormal);
+		float fVDotH = max(dot(normalizedView, sampleV), 0.0);
 
-		if(fNDotL > 0.0) 
+		vec3 lightV = reflect(-normalizedView, sampleV); //2.0 * fVDotH * halfV - view;
+		float fNDotL = dot(normal, lightV);
+
+		//if(fNDotL > 0.0) 
 		{
-			float fNDotH = clamp(dot(normal, halfV), 0.0, 1.0);
-			float fLDotH = clamp(dot(lightV, halfV), 0.0, 1.0);
+			float fNDotH = clamp(dot(normal, sampleV), 0.0, 1.0);
+			float fLDotH = clamp(dot(lightV, sampleV), 0.0, 1.0);
 
 			float fLOD = distribution(fNDotH, fVDotH, fRoughness);
 			vec4 color = textureCube(environmentSampler, lightV, fLOD) * gfTextureMult;
-
+			
 			float fFresnel = fresnel(fVDotH, fRefract);
 			float fGeometry = geometry(fVDotH, fLDotH, fRoughness);
 			float fDenom = 1.0 / (fNDotH * fNDotV);
-			float fBRDF = clamp(fGeometry * fFresnel * fVDotH * fDenom, 0.0, 1.0);
+			float fBRDF = clamp(fGeometry * fFresnel * fDenom, 0.0, 1.0);
 
-			ret.xyz += color.xyz * fBRDF;
-			fTotal += 1.0;
+			/*if(fVDotH < 0.2)
+			{
+				color.x = 1.0; color.y = 0.0; color.z = 0.0;
+			}*/
 
 			specularOut.fresnel += fFresnel;
 			specularOut.color += color.xyz * fBRDF;
+		
+			fTotal += 1.0;
 		}
 	}
-
-	ret.xyz /= float(NUM_SAMPLES);
 
 	specularOut.color /= fTotal;
 	specularOut.fresnel /= fTotal;
@@ -265,7 +269,7 @@ SpecularOut brdf(vec3 normal, float fRoughness, float fRefract, vec3 view)
 */
 float chebyshevUpperBound(vec2 moments, float fDistance)
 {
-	const float fMinVariance = 0.00001;
+	const float fMinVariance = 0.000001;
 
 	if(fDistance <= moments.x)
 	{
@@ -286,8 +290,9 @@ float chebyshevUpperBound(vec2 moments, float fDistance)
 */
 vec4 inShadow(vec4 worldPos)
 {
-	const float fSampleSpread = 0.0005;
+	const float fSampleSpread = 0.001;
 	const float fSampleRate = 0.002;
+	const float fBias = 0.0;
 
 	vec4 lightSpacePos = lightProjectionMatrix * lightViewMatrix * worldPos;
 
@@ -296,6 +301,7 @@ vec4 inShadow(vec4 worldPos)
 	
 	vec4 totalColor = vec4(0.0, 0.0, 0.0, 1.0);
 	float fTotalSamples = 0.0;
+	
 	for(float i = -fSampleRate; i <= fSampleRate; i += fSampleSpread)
 	{
 		for(float j = -fSampleRate; j <= fSampleRate; j += fSampleSpread)
@@ -308,7 +314,7 @@ vec4 inShadow(vec4 worldPos)
 
 			vec2 lightSpaceUV = vec2(fU, fV);
 			vec4 depth = texture2D(lightViewDepthMap, lightSpaceUV);
-			float fCurrDepth = lightSpacePos.z / lightSpacePos.w;
+			float fCurrDepth = (lightSpacePos.z / lightSpacePos.w) * 0.5 + 0.5;
 			
 			vec2 moments = vec2(depth.x, depth.y);
 			float fContrib = chebyshevUpperBound(moments, fCurrDepth);
@@ -316,7 +322,7 @@ vec4 inShadow(vec4 worldPos)
 			totalColor.y += fContrib;
 			totalColor.z += fContrib;
 
-			/*if(depth.x <= fCurrDepth - 0.0005)
+			/*if(depth.x <= fCurrDepth - fBias)
 			{
 				totalColor.x += 0.3;
 				totalColor.y += 0.3;
@@ -399,19 +405,29 @@ void main()
 	//gl_FragColor.xyz = normal.xyz;
 	//gl_FragColor.w = 1.0;
 
-	vec3 KDiffuse = diffuse2(worldSpaceNormal3);
+	vec3 KDiffuse = diffuse(worldSpaceNormal3);
 
-	vec3 view = normalize(eyePos - worldPos.xyz);
+	//vec3 view = normalize(eyePos - worldPos.xyz);
+	//vec3 view = lookDir;
+	vec3 view = -normalize(clipSpace.xyz);
+
+	//float fDP = dot(view.xyz, worldSpaceNormal3);
+	//gl_FragColor = vec4(fDP, fDP, fDP, 1.0);
+
 	SpecularOut specularOut = brdf(worldSpaceNormal3, fRoughness, fRefract, view);
 	vec3 KSpecular = specularOut.color;
 
-	//gl_FragColor = vec4(KSpecular, 1.0);
+	/*if(KSpecular.x <= 0.0 || KSpecular.y <= 0.0 || KSpecular.z <= 0.0)
+	{
+		KSpecular.x = 1.0;
+		KSpecular.y = 0.0;
+		KSpecular.z = 0.0;
+	}*/
 
 	vec3 dielectric = KDiffuse;
 	vec3 metal = KSpecular;
-	vec3 color = dielectric * (fMetalVal) + metal * (1.0 - fMetalVal);
-	gl_FragColor = vec4(color, 1.0) * albedo; 
-
-	//gl_FragColor *= inShadow(worldPos);
-	gl_FragColor = inShadow(worldPos);
+	vec3 color =  dielectric * (1.0 - fMetalVal) + metal * fMetalVal;
+	gl_FragColor = vec4(color, 1.0); 
+	gl_FragColor *= inShadow(worldPos);
+	
 }

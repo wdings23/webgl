@@ -23,11 +23,14 @@ void main()
 	gl_FragData[1].z = vClipSpacePos.z / vClipSpacePos.w;
 	gl_FragData[1].w = 1.0;
 
+	vec2 newUV = vUV.xy;
+	newUV.y = 1.0 - newUV.y;
+
 	gl_FragData[2] = vWorldPos;
-	gl_FragData[3] = texture2D(albedoSampler, vUV.xy);
-	gl_FragData[4] = texture2D(normalSampler, vUV.xy);
-	gl_FragData[5].x = texture2D(metalnessSampler, vUV.xy).x;
-	gl_FragData[5].y = texture2D(roughnessSampler, vUV.xy).y;
+	gl_FragData[3] = texture2D(albedoSampler, newUV);
+	gl_FragData[4] = texture2D(normalSampler, newUV);
+	gl_FragData[5].x = texture2D(metalnessSampler, newUV).x;
+	gl_FragData[5].y = texture2D(roughnessSampler, newUV).y;
 	gl_FragData[5].z = 0.0;
 	gl_FragData[5].w = 1.0;
 	
