@@ -571,19 +571,6 @@ function update()
 */
 function draw()
 {
-    var matRotY = new Matrix44();
-    matRotY.rotateY(3.14159 * 1.87);
-    
-    var matRotX = new Matrix44();
-    matRotX.rotateX(0.15);
-
-    var totalRot = matRotX.multiply(matRotY);
-   
-    var matTrans = new Matrix44();
-    //matTrans.translate(gCamera.position.x - 0.85, (gCamera.position.y - 0.6) + gBob, gCamera.position.z - 1.1);
-    matTrans.translate(0.0, 0.0, 0.0);
-    var matModel = matTrans.multiply(totalRot);
-    
     var componentCount = 0;
     var count = 0;
 
@@ -1460,7 +1447,13 @@ function drawMRT(shaderName)
             var posX = ((i - allModelMatrices.length / 2) + i);
 
             matTrans.translate(posX, 0.0, 0.0);
-            var matModel = matTrans.multiply(totalRot);
+
+            var matScale = new Matrix44();
+            matScale.scale(3.0, 3.0, 3.0);
+            
+            var matTransRot = matTrans.multiply(totalRot);
+
+            var matModel = matScale.multiply(matTransRot);
 
             allModelMatrices.push(matModel);
         }
@@ -2001,7 +1994,12 @@ function drawFromLight()
             var posX = ((i - allModelMatrices.length / 2) + i);
 
             matTrans.translate(posX, 0.0, 0.0);
-            var matModel = matTrans.multiply(totalRot);
+
+            var matScale = new Matrix44();
+            matScale.scale(3.0, 3.0, 3.0);
+
+            var matTransRot = matTrans.multiply(totalRot);
+            var matModel = matScale.multiply(matTransRot);
 
             allModelMatrices.push(matModel);
         }
