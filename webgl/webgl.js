@@ -403,7 +403,7 @@ function initGL()
             9,
         ]
         */
-        gCamera = new Camera(new Vector3(0.0, 0.0, -6.0), new Vector3(0.0, 0.0, 100.0));
+        gCamera = new Camera(new Vector3(0.0, 1.0, -2.0), new Vector3(0.0, 0.0, 100.0));
         //gCamera = new Camera(new Vector3(5.0, 10.0, 5.0), new Vector3(0.0, 0.0, 0.0));
         gLightViewCamera = new Camera(new Vector3(5.0, 10.0, 5.0), new Vector3(0.0, 0.0, 0.0));
 

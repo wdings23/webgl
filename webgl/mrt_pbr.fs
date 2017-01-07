@@ -24,7 +24,7 @@ float fImageDimension = 128.0;
 float fOneOverPI = 1.0 / 3.14159;
 float gfTextureMult = 1.0;
 
-struct SpecularOut
+struct IBLSpecularOut
 {
 	vec3		color;
 	float		fresnel;
@@ -70,7 +70,7 @@ float geometry(float fVDotH, float fLDotH, float fRoughness)
 float fresnel(float fVDotH, float fRefractIndex)
 {
 	float fFC = pow(1.0 - fVDotH, 5.0);
-	float fF0 = (1.0 - fRefractIndex) / (1.0 + fRefractIndex);
+	float fF0 = abs((1.0 - fRefractIndex) / (1.0 + fRefractIndex));
 	fF0 *= fF0;
 
 	float fFresnel = fF0 + (1.0 - fF0) * fFC;
@@ -206,9 +206,9 @@ vec3 diffuse2(vec3 normal)
 /*
 **
 */
-SpecularOut brdf(vec3 normal, float fRoughness, float fRefract, vec3 view)
+IBLSpecularOut brdf(vec3 normal, float fRoughness, float fRefract, vec3 view)
 {
-	SpecularOut specularOut;
+	IBLSpecularOut specularOut;
 	specularOut.color = vec3(0.0, 0.0, 0.0);
 	specularOut.fresnel = 0.0;
 
@@ -245,11 +245,6 @@ SpecularOut brdf(vec3 normal, float fRoughness, float fRefract, vec3 view)
 			float fGeometry = geometry(fVDotH, fLDotH, fRoughness);
 			float fDenom = 1.0 / (fNDotH * fNDotV);
 			float fBRDF = clamp(fGeometry * fFresnel * fDenom, 0.0, 1.0);
-
-			/*if(fVDotH < 0.2)
-			{
-				color.x = 1.0; color.y = 0.0; color.z = 0.0;
-			}*/
 
 			specularOut.fresnel += fFresnel;
 			specularOut.color += color.xyz * fBRDF;
@@ -347,6 +342,42 @@ vec4 inShadow(vec4 worldPos)
 /*
 **
 */
+vec3 computeSpecular(
+	vec3 specularColor,
+	vec3 worldPos,
+	vec3 normal, 
+	float fRoughness,
+	float fRefractIndex, 
+	vec3 view,
+	vec3 lightPos)
+{
+	vec3 normalizedView = normalize(view);
+
+	vec3 lightV = normalize(lightPos - worldPos);
+	vec3 halfV = normalize(lightV + normalizedView);
+	
+	float fVDotH = clamp(dot(halfV, normalizedView), 0.0, 1.0);
+	float fLDotH = clamp(dot(lightV, halfV), 0.0, 1.0);
+	float fNDotH = clamp(dot(normal, halfV), 0.0, 1.0);
+	float fNDotV = clamp(dot(normal, normalizedView), 0.0, 1.0);
+
+	//fRoughness = 0.3;
+
+	float fA = fRoughness * fRoughness;
+	float fCosSquared = fNDotH * fNDotH;
+	float fDistributionDenom = 1.0 / (1.0 + fCosSquared * (fA * fA - 1.0));
+	float fDistribution = fA * fA * fOneOverPI * fDistributionDenom * fDistributionDenom;
+
+	float fFresnel = fresnel(fVDotH, fRefractIndex);
+	float fGeometry = geometry(fVDotH, fLDotH, fRoughness);
+	float fDenom = clamp(1.0 / ((4.0 * fNDotV * fNDotH) + 0.005), 0.0, 1.0);
+
+	return specularColor * fFresnel * fDistribution * fGeometry * fDenom; // * fFresnel * fGeometry;	
+}
+
+/*
+**
+*/
 void main()
 {
 	/*uniform samplerCube		environmentSampler;
@@ -395,39 +426,34 @@ void main()
 	worldSpaceMat[2] = vec4(normal.xyz, 0.0);
 	worldSpaceMat[3] = vec4(0.0, 0.0, 0.0, 1.0);
 	
+	// ibl diffuse
 	vec4 worldSpaceNormal = worldSpaceMat * normalColor;
 	vec3 worldSpaceNormal3 = vec3(worldSpaceNormal.xyz);
+	vec3 iblDiffuse = diffuse(worldSpaceNormal3);
 
-	//vec4 lightDir = vec4(1.0, 1.0, 1.0, 1.0);
-	//lightDir = normalize(lightDir);
-	//float fDP = dot(worldSpaceNormal, lightDir);
-	//gl_FragColor = vec4(fDP, fDP, fDP, 1.0);
-	//gl_FragColor.xyz = normal.xyz;
-	//gl_FragColor.w = 1.0;
-
-	vec3 KDiffuse = diffuse(worldSpaceNormal3);
-
-	//vec3 view = normalize(eyePos - worldPos.xyz);
-	//vec3 view = lookDir;
+	// ibl specular
 	vec3 view = -normalize(clipSpace.xyz);
+	IBLSpecularOut iblSpecular = brdf(worldSpaceNormal3, fRoughness, fRefract, view);
+	
+	vec3 lightPos = vec3(4.0, 10.0, 10.0);
+	
+	// specular
+	vec3 specularColor = computeSpecular(
+		vec3(0.4, 0.4, 0.4),
+		worldPos.xyz,
+		worldSpaceNormal3,
+		fRoughness,
+		fRefract,
+		view,
+		lightPos);
 
-	//float fDP = dot(view.xyz, worldSpaceNormal3);
-	//gl_FragColor = vec4(fDP, fDP, fDP, 1.0);
+	vec3 lightV = normalize(lightPos - worldPos.xyz);
+	vec3 diffuseColor = vec3(clamp(dot(worldSpaceNormal3, lightV), 0.0, 1.0));
 
-	SpecularOut specularOut = brdf(worldSpaceNormal3, fRoughness, fRefract, view);
-	vec3 KSpecular = specularOut.color;
-
-	/*if(KSpecular.x <= 0.0 || KSpecular.y <= 0.0 || KSpecular.z <= 0.0)
-	{
-		KSpecular.x = 1.0;
-		KSpecular.y = 0.0;
-		KSpecular.z = 0.0;
-	}*/
-
-	vec3 dielectric = KDiffuse;
-	vec3 metal = KSpecular;
-	vec3 color =  dielectric * (1.0 - fMetalVal) + metal * fMetalVal;
+	vec3 dielectric = iblDiffuse;
+	vec3 metal = iblSpecular.color;
+	vec3 color =  ((dielectric + diffuseColor) * (1.0 - fMetalVal)) + (specularColor + iblSpecular.color) * fMetalVal;//dielectric * (1.0 - fMetalVal) + (metal + specularColor) * fMetalVal;
 	gl_FragColor = vec4(color, 1.0); 
-	gl_FragColor *= inShadow(worldPos);
+	//gl_FragColor *= inShadow(worldPos);
 	
 }
