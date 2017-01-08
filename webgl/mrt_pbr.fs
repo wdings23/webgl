@@ -456,7 +456,7 @@ fMetalVal = 1.0;
 
 	vec3 diffuse = (iblDiffuse + diffuseColor) * (1.0 - fMetalVal) * albedo.xyz;
 	vec3 specular = (specularColor + iblSpecular.color * albedo.xyz) * fMetalVal;
-	vec3 color =  /*diffuse + */specular;
+	vec3 color =  diffuse + specular;
 	gl_FragColor = vec4(color, 1.0); 
 	//gl_FragColor *= inShadow(worldPos);
 	
