@@ -135,9 +135,17 @@ function saveModel(obj)
                     var v2 = parseInt(primitive.indices._elements[j + 2]) + 1;
 
                     dataOutput += 'f ';
-                    dataOutput += v0 + '/' + v0 + '/' + v0 + ' ';
-                    dataOutput += v1 + '/' + v1 + '/' + v1 + ' ';
-                    dataOutput += v2 + '/' + v2 + '/' + v2 + '\n';
+                    if (j % 2 == 0) {
+                        dataOutput += v0 + '/' + v0 + '/' + v0 + ' ';
+                        dataOutput += v1 + '/' + v1 + '/' + v1 + ' ';
+                        dataOutput += v2 + '/' + v2 + '/' + v2 + '\n';
+                    }
+                    else
+                    {
+                        dataOutput += v0 + '/' + v0 + '/' + v0 + ' ';
+                        dataOutput += v2 + '/' + v2 + '/' + v2 + ' ';
+                        dataOutput += v1 + '/' + v1 + '/' + v1 + '\n';
+                    }
                 }
             }
         }
