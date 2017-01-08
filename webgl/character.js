@@ -384,6 +384,8 @@ Character.prototype.loadTextures = function(textureNames)
 
             self.textures[this.index] = this.texture;
             self.numTextureLoaded += 1;
+
+            console.log('loaded texture ' + this.index + ' : ' + this.texture.image.src);
         }
 
         texture.image.src = textureName;

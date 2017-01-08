@@ -23,6 +23,7 @@ var gLightViewQuadBuffer;
 var gLightViewCamera;
 
 var gDVA;
+var gPistol = null;
 
 var gLightViewFrameBuffer = null;
 var gGround = {vbo: null, textures: null};
@@ -146,6 +147,52 @@ function loadDVA()
 /*
 **
 */
+function loadCharacter(url, loadedFunc)
+{
+    /*
+    <character>
+        <model>models/pistol/pistol.obj</model>
+        <albedo>models/pistol/pistol_albedo.jpg</albedo>
+        <metal>models/pistol/pistol_metal.jpg</metal>
+        <rough>models/pistol/pistol_rough.jpg</rough>
+        <normal>models/pistol/pistol_normal.jpg</normal>
+    </character>
+    */
+
+    var xhr = new XMLHttpRequest();
+    xhr.addEventListener('load',
+        function () {
+            var parser = new DOMParser();
+            var xmlDoc = parser.parseFromString(this.responseText, 'text/xml');
+            var modelName = xmlDoc.getElementsByTagName('model')[0].textContent;
+            var albedo = xmlDoc.getElementsByTagName('albedo')[0].textContent;
+            var metal = xmlDoc.getElementsByTagName('metal')[0].textContent;
+            var rough = xmlDoc.getElementsByTagName('rough')[0].textContent;
+            var normal = xmlDoc.getElementsByTagName('normal')[0].textContent;
+
+            var character = new Character();
+            character.name = modelName;
+            var textureNames = [albedo, metal, rough, normal];
+
+            character.loadOBJ(modelName);
+            character.loadTextures(textureNames);
+
+            character.albedo = [0, 0, 0];
+            character.metalness = [1, 1, 1];
+            character.roughness = [2, 2, 2];
+            character.normalMap = [3, 3, 3];
+
+            loadedFunc(character);
+
+        });
+
+    xhr.open('GET', url);
+    xhr.send();
+}
+
+/*
+**
+*/
 var gLookAngleX = 0.0;
 var gLookAngleY = 0.0;
 function initGL()
@@ -241,6 +288,7 @@ function initGL()
         [gMRTFramebuffer, gaMRTTextures, gDepthTexture] = createFBTextures();
         [gLightViewFrameBuffer, gLightViewTexture] = createLightViewFrameBuffer();
 
+        // debug texture quads
         gaMRTQuadBuffer.push(createQuad(0.4, -1.4, -0.5));
         gaMRTQuadBuffer.push(createQuad(0.4, -0.9, -0.5));
         gaMRTQuadBuffer.push(createQuad(0.4, -0.4, -0.5));
@@ -250,6 +298,8 @@ function initGL()
         
         gLightViewQuadBuffer = createQuad(0.4, -1.4, 0.5);
         gMRTFinalQuadBuffer = createQuad(2.0, 0.0, 0.0);
+
+        loadData();
 
         var groundBuffer = createGround(20.0, 0.0, 0.0, 0.0);
         gGround.vbo = groundBuffer;
@@ -563,7 +613,7 @@ function update()
         up.x = 0.0; up.y = 0.0; up.z = 1.0;
     }
 
-    gCamera.update(up, 100.0, 1.0, 500.0, 500.0);
+    gCamera.update(up, 100.0, 0.5, 500.0, 500.0);
 }
 
 /*
@@ -571,9 +621,6 @@ function update()
 */
 function draw()
 {
-    var componentCount = 0;
-    var count = 0;
-
     var shader = gShaderManager.getShaderProgram("pbr");
     if (shader)
     {
@@ -689,55 +736,6 @@ function draw()
 
         drawCharacters(allModels, allModelMatrices, modelMatrixUniform, vertexAttrib, normalAttrib, uvAttrib, true, 1);
 
-        /*for (var i = 0; i < gaMaterialModels.length; i++)
-        {
-            var materialModel = gaMaterialModels[i];
-
-            var matRotY = new Matrix44();
-            matRotY.rotateY(3.14159 * 1.87);
-
-            var matRotX = new Matrix44();
-            matRotX.rotateX(0.15);
-
-            var totalRot = matRotX.multiply(matRotY);
-
-            var matTrans = new Matrix44();
-
-            var posX = ((i - gaMaterialModels.length / 2) + i) * 1.5;
-
-            matTrans.translate(posX, 0.0, 0.0);
-            var matModel = matTrans.multiply(totalRot);
-
-            // matrix uniforms
-            if (modelMatrixUniform)
-            {
-                gl.uniformMatrix4fv(modelMatrixUniform, false, new Float32Array(matModel.entries));
-            }
-
-            for(var j = 0; j < materialModel.models.length; j++)
-            {
-                var model = materialModel.models[j];
-
-                gl.activeTexture(gl.TEXTURE0 + 1);
-                gl.bindTexture(gl.TEXTURE_2D, materialModel.textures[materialModel.albedo[j]]);
-
-                gl.activeTexture(gl.TEXTURE0 + 2);
-                gl.bindTexture(gl.TEXTURE_2D, materialModel.textures[materialModel.metalness[j]]);
-
-                gl.activeTexture(gl.TEXTURE0 + 3);
-                gl.bindTexture(gl.TEXTURE_2D, materialModel.textures[materialModel.roughness[j]]);
-
-                gl.activeTexture(gl.TEXTURE0 + 4);
-                gl.bindTexture(gl.TEXTURE_2D, materialModel.textures[materialModel.normalMap[j]]);
-
-                gl.bindBuffer(gl.ARRAY_BUFFER, model.vbo)
-                gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 32, 0);
-                gl.vertexAttribPointer(normalAttrib, 3, gl.FLOAT, false, 32, stride);
-                gl.vertexAttribPointer(uvAttrib, 2, gl.FLOAT, false, 32, stride + stride);
-                gl.drawArrays(gl.TRIANGLES, 0, model.floatArray.length / 8);
-            }
-        }*/
-
         gl.disable(gl.DEPTH_TEST);
         drawCrossHair(gCrossHairInfo[0], gCrossHairInfo[1]);
         for (var i = 0; i < gaMRTQuadBuffer.length; i++) {
@@ -747,37 +745,15 @@ function draw()
         drawQuad(gLightViewQuadBuffer, gLightViewTexture);
 
         gl.enable(gl.DEPTH_TEST);
-
-        /*for (var i = 0; i < gCharacter.models.length; i++)
-        {
-            var model = gCharacter.models[i];
-
-            gl.activeTexture(gl.TEXTURE0 + 1);
-            gl.bindTexture(gl.TEXTURE_2D, gCharacter.textures[gCharacter.albedo[i]]);
-            
-            gl.activeTexture(gl.TEXTURE0 + 2);
-            gl.bindTexture(gl.TEXTURE_2D, gCharacter.textures[gCharacter.metalness[i]]);
-
-            gl.activeTexture(gl.TEXTURE0 + 3);
-            gl.bindTexture(gl.TEXTURE_2D, gCharacter.textures[gCharacter.roughness[i]]);
-
-            gl.activeTexture(gl.TEXTURE0 + 4);
-            gl.bindTexture(gl.TEXTURE_2D, gCharacter.textures[gCharacter.normalMap[i]]);
-
-            gl.bindBuffer(gl.ARRAY_BUFFER, model.vbo)
-            gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 32, 0);
-            gl.vertexAttribPointer(normalAttrib, 3, gl.FLOAT, false, 32, stride);
-            gl.vertexAttribPointer(uvAttrib, 2, gl.FLOAT, false, 32, stride + stride);
-            gl.drawArrays(gl.TRIANGLES, 0, model.floatArray.length / 8);
-          
-        }   */
     }
 }
 
 function drawCharacters(
     characters,
     modelMatrices,
+    normalMatrices,
     modelMatrixUniform,
+    normalMatrixUniform,
     vertexAttrib,
     normalAttrib,
     uvAttrib,
@@ -789,10 +765,15 @@ function drawCharacters(
     for (var i = 0; i < characters.length; i++) {
         var character = characters[i];
         var matModel = modelMatrices[i];
+        var matNormal = normalMatrices[i];
 
         // matrix uniforms
         if (modelMatrixUniform) {
             gl.uniformMatrix4fv(modelMatrixUniform, false, new Float32Array(matModel.entries));
+        }
+
+        if (normalMatrixUniform) {
+            gl.uniformMatrix4fv(normalMatrixUniform, false, new Float32Array(matNormal.entries));
         }
 
         for (var j = 0; j < character.models.length; j++) {
@@ -815,11 +796,11 @@ function drawCharacters(
             gl.bindBuffer(gl.ARRAY_BUFFER, model.vbo)
             gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 32, 0);
 
-            if (normalAttrib) {
+            if (normalAttrib >= 0) {
                 gl.vertexAttribPointer(normalAttrib, 3, gl.FLOAT, false, 32, stride);
             }
 
-            if (uvAttrib) {
+            if (uvAttrib >= 0) {
                 gl.vertexAttribPointer(uvAttrib, 2, gl.FLOAT, false, 32, stride + stride);
             }
 
@@ -1325,229 +1306,6 @@ function createFBTextures()
     return [frameBuffer, mrtTextures, depthTexture];
 }
 
-/*
-**
-*/
-function drawMRT(shaderName)
-{
-    var oldFB = gl.getParameter(gl.FRAMEBUFFER_BINDING);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, gMRTFramebuffer);
-
-    var shader = gShaderManager.getShaderProgram('mrt');
-    if (shader == null)
-    {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, oldFB);
-        return;
-    }
-
-    gl.useProgram(shader.program);
-
-    var matRotY = new Matrix44();
-    matRotY.rotateY(3.14159 * 1.87);
-    
-    var matRotX = new Matrix44();
-    matRotX.rotateX(0.15);
-
-    var totalRot = matRotX.multiply(matRotY);
-   
-    var matTrans = new Matrix44();
-    //matTrans.translate(gCamera.position.x - 0.85, (gCamera.position.y - 0.6) + gBob, gCamera.position.z - 1.1);
-    matTrans.translate(0.0, 0.0, 0.0);
-    var matModel = matTrans.multiply(totalRot);
-    
-    var componentCount = 0;
-    var count = 0;
-
-    var shader = gShaderManager.getShaderProgram(shaderName);
-    if (shader)
-    {
-        gl.useProgram(shader.program);
-
-        // uniforms
-        var modelMatrixUniform = gl.getUniformLocation(shader.program, "modelMatrix");
-        var viewMatrixUniform = gl.getUniformLocation(shader.program, 'viewMatrix');
-        var projectionMatrixUniform = gl.getUniformLocation(shader.program, 'projMatrix');
-        var normalMatrixUniform = gl.getUniformLocation(shader.program, 'normMatrix');
-        var cameraTangentMatrixUniform = gl.getUniformLocation(shader.program, 'cameraTangentMatrix');
-
-        // vertex attribs (position and normal)
-        var vertexAttrib = gl.getAttribLocation(shader.program, "position");
-        var normalAttrib = gl.getAttribLocation(shader.program, "normal");
-        var uvAttrib = gl.getAttribLocation(shader.program, "uv");
-
-        gl.enableVertexAttribArray(vertexAttrib);
-        gl.enableVertexAttribArray(normalAttrib);
-        gl.enableVertexAttribArray(uvAttrib);
-
-        var tex0Uniform = gl.getUniformLocation(shader.program, 'albedoSampler');
-        var tex1Uniform = gl.getUniformLocation(shader.program, 'metalnessSampler');
-        var tex2Uniform = gl.getUniformLocation(shader.program, 'roughnessSampler');
-        var tex3Uniform = gl.getUniformLocation(shader.program, 'normalSampler');
-        
-        gl.uniform1i(tex0Uniform, 0);
-        gl.uniform1i(tex1Uniform, 1);
-        gl.uniform1i(tex2Uniform, 2);
-        gl.uniform1i(tex3Uniform, 3);
-        
-        var stride = 3 * Float32Array.BYTES_PER_ELEMENT;
-        if (viewMatrixUniform) {
-            gl.uniformMatrix4fv(viewMatrixUniform, false, new Float32Array(gCamera.viewMatrix.entries));
-        }
-
-        if (projectionMatrixUniform) {
-            gl.uniformMatrix4fv(projectionMatrixUniform, false, new Float32Array(gCamera.projectionMatrix.entries));
-        }
-
-        if (normalMatrixUniform) {
-            var orthonormalViewMatrix = new Matrix44();
-            orthonormalViewMatrix.copy(gCamera.viewMatrix);
-            orthonormalViewMatrix.entries[12] = orthonormalViewMatrix.entries[13] = orthonormalViewMatrix.entries[14] = 0.0;
-
-            var totalNormMatrix = matModel.multiply(orthonormalViewMatrix);
-            gl.uniformMatrix4fv(normalMatrixUniform, false, new Float32Array(totalNormMatrix.entries));
-        }
-
-        if (cameraTangentMatrixUniform) {
-            // camera tangent space
-            var up = new Vector3(0.0, 1.0, 0.0);
-            var zAxis = gCamera.lookAt.subtract(gCamera.position);
-            zAxis.normalize();
-            var xAxis = up.cross(zAxis);
-            var yAxis = zAxis.cross(xAxis);
-            xAxis.normalize();
-            yAxis.normalize();
-
-            var cameraTangentMatrix = new Matrix44();
-            cameraTangentMatrix.entries[0] = xAxis.x;
-            cameraTangentMatrix.entries[1] = xAxis.y;
-            cameraTangentMatrix.entries[2] = xAxis.z;
-            cameraTangentMatrix.entries[4] = yAxis.x;
-            cameraTangentMatrix.entries[5] = yAxis.y;
-            cameraTangentMatrix.entries[6] = yAxis.z;
-            cameraTangentMatrix.entries[7] = zAxis.x;
-            cameraTangentMatrix.entries[8] = zAxis.y;
-            cameraTangentMatrix.entries[9] = zAxis.z;
-
-            gl.uniformMatrix4fv(cameraTangentMatrixUniform, false, new Float32Array(cameraTangentMatrix.entries));
-        }
-
-        gl.clearColor(0.0, 0.0, 0.0, 0.0);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-        var allModels = [gDVA];
-        var allModelMatrices = [];
-        for (var i = 0; i < allModels.length; i++) {
-            var matRotY = new Matrix44();
-            matRotY.rotateY(3.14159 * 1.87);
-            var matRotX = new Matrix44();
-            matRotX.rotateX(0.15);
-
-            var totalRot = matRotX.multiply(matRotY);
-            var matTrans = new Matrix44();
-            var posX = ((i - allModelMatrices.length / 2) + i);
-
-            matTrans.translate(posX, 0.0, 0.0);
-
-            var matScale = new Matrix44();
-            matScale.scale(3.0, 3.0, 3.0);
-            
-            var matTransRot = matTrans.multiply(totalRot);
-
-            var matModel = matScale.multiply(matTransRot);
-
-            allModelMatrices.push(matModel);
-        }
-
-        drawCharacters(allModels, allModelMatrices, modelMatrixUniform, vertexAttrib, normalAttrib, uvAttrib, true, 0);
-
-        /*for (var i = 0; i < gaMaterialModels.length; i++) {
-            var materialModel = gaMaterialModels[i];
-
-            var matRotY = new Matrix44();
-            var matRotX = new Matrix44();
-            matRotY.rotateY(Math.PI * 1.87);
-            matRotX.rotateX(0.15);
-
-            var totalRot = matRotX.multiply(matRotY);
-            var matTrans = new Matrix44();
-
-            var posX = ((i - gaMaterialModels.length / 2) + i) * 1.5;
-
-            matTrans.translate(posX, 0.0, 0.0);
-            var matModel = matTrans.multiply(totalRot);
-
-            // matrix uniforms
-            if (modelMatrixUniform) {
-                gl.uniformMatrix4fv(modelMatrixUniform, false, new Float32Array(matModel.entries));
-            }
-
-            // set texture and draw
-            for (var j = 0; j < materialModel.models.length; j++)
-            {
-                var model = materialModel.models[j];
-                var albedo = materialModel.textures[materialModel.albedo[j]];
-                var metalness = materialModel.textures[materialModel.metalness[j]];
-                var roughness = materialModel.textures[materialModel.roughness[j]];
-                var normalMap = materialModel.textures[materialModel.normalMap[j]];
-                if (albedo == null || metalness == null || roughness == null || normalMap == null)
-                {
-                    continue;
-                }
-
-                gl.activeTexture(gl.TEXTURE0);
-                gl.bindTexture(gl.TEXTURE_2D, albedo);
-
-                gl.activeTexture(gl.TEXTURE0 + 1);
-                gl.bindTexture(gl.TEXTURE_2D, metalness);
-
-                gl.activeTexture(gl.TEXTURE0 + 2);
-                gl.bindTexture(gl.TEXTURE_2D, roughness);
-
-                gl.activeTexture(gl.TEXTURE0 + 3);
-                gl.bindTexture(gl.TEXTURE_2D, normalMap);
-
-                gl.bindBuffer(gl.ARRAY_BUFFER, model.vbo)
-                gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 32, 0);
-                gl.vertexAttribPointer(normalAttrib, 3, gl.FLOAT, false, 32, stride);
-                gl.vertexAttribPointer(uvAttrib, 2, gl.FLOAT, false, 32, stride + stride);
-                gl.drawArrays(gl.TRIANGLES, 0, model.floatArray.length / 8);
-            }
-
-        }   // for i = 0 to num models*/
-
-        // ground
-        (function drawGround()
-        {
-            if (gGround.textures == null)
-            {
-                return;
-            }
-
-            var stride = 3 * Float32Array.BYTES_PER_ELEMENT;
-            for (var i = 0; i < gGround.textures.length; i++)
-            {
-                gl.activeTexture(gl.TEXTURE0 + i);
-                gl.bindTexture(gl.TEXTURE_2D, gGround.textures[i]);
-            }
-
-            // vertex attribs (position and normal)
-            var vertexAttrib = gl.getAttribLocation(shader.program, "position");
-            var normalAttrib = gl.getAttribLocation(shader.program, "normal");
-            var uvAttrib = gl.getAttribLocation(shader.program, "uv");
-
-            gl.bindBuffer(gl.ARRAY_BUFFER, gGround.vbo)
-            gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 32, 0);
-            gl.vertexAttribPointer(normalAttrib, 3, gl.FLOAT, false, 32, stride);
-            gl.vertexAttribPointer(uvAttrib, 2, gl.FLOAT, false, 32, stride + stride);
-            gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-        })();
-
-    }   // if valid shader 
-
-    gl.clearColor(0.0, 0.0, 0.5, 1.0);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, oldFB);
-}
 
 /*
 **
@@ -1727,108 +1485,7 @@ function drawQuad(quadBuffer, texture)
     }
 }
 
-/*
-**
-*/
-function drawMRTFinal(quadBuffer)
-{
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    var shader = gShaderManager.getShaderProgram('mrt_pbr');
-    if(shader != null)
-    {
-        gl.useProgram(shader.program);
-
-        // light view camera matrix
-        var lightViewMatrixUniform = gl.getUniformLocation(shader.program, 'lightViewMatrix');
-        var lightProjectionMatrixUniform = gl.getUniformLocation(shader.program, 'lightProjectionMatrix');
-        gl.uniformMatrix4fv(lightViewMatrixUniform, false, new Float32Array(gLightViewCamera.viewMatrix.entries));
-        gl.uniformMatrix4fv(lightProjectionMatrixUniform, false, new Float32Array(gLightViewCamera.projectionMatrix.entries));
-
-        // sampling and eye coordinates uniforms
-        var sampleCoordUniform = gl.getUniformLocation(shader.program, 'afSamplePos');
-        var eyeCoordUniform = gl.getUniformLocation(shader.program, 'eyePos');
-        var lookDirUniform = gl.getUniformLocation(shader.program, 'lookDir');
-
-        var lookDir = gCamera.lookAt.subtract(gCamera.position);
-        lookDir.normalize();
-        gl.uniform3f(lookDirUniform, lookDir.x, lookDir.y, lookDir.z);
-
-        var samplePos = getSampleCoords(128);
-        gl.uniform2fv(sampleCoordUniform, new Float32Array(samplePos));
-        gl.uniform3f(eyeCoordUniform, gCamera.position.x, gCamera.position.y, gCamera.position.z);
-
-        // attribs (position and uv)
-        var vertexAttrib = gl.getAttribLocation(shader.program, "position");
-        gl.enableVertexAttribArray(vertexAttrib);
-
-        var uvAttrib = gl.getAttribLocation(shader.program, "uv");
-        gl.enableVertexAttribArray(uvAttrib);
-
-        var samplerNames =
-        [
-            'environmentSampler',
-            'normalMap',
-            'clipSpaceMap',
-            'worldSpaceMap',
-            'albedoMap',
-            'normalSampler',
-            'metalRoughnessMap',
-        ];
-
-        // texture map samplers
-        var uniforms = [];
-        for (var i = 0; i < samplerNames.length; i++) {
-            uniforms.push(gl.getUniformLocation(shader.program, samplerNames[i]));
-            gl.uniform1i(uniforms[i], i);
-        }
-
-        var lightViewUniform  = gl.getUniformLocation(shader.program, 'lightViewDepthMap');
-        gl.uniform1i(lightViewUniform, samplerNames.length);
-
-        //var MRTEnum =
-        //{
-        //    NORMAL: 0,
-        //    CLIPSPACE: 1,
-        //    WORLDSPACE: 2,
-        //    ALBEDO: 3,
-        //    NORMALMAP: 4,
-        //    METAL_ROUGHNESS: 5,
-        //};
-
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_CUBE_MAP, gEnvMap);
-        
-        for(var i = 0; i <= MRTEnum.NUM_MRT; i++)
-        {
-            gl.activeTexture(gl.TEXTURE0 + i + 1);
-            gl.bindTexture(gl.TEXTURE_2D, gaMRTTextures[i]);
-        }
-
-        gl.activeTexture(gl.TEXTURE0 + samplerNames.length);
-        gl.bindTexture(gl.TEXTURE_2D, gLightViewTexture);
-
-        var stride = 4 * Float32Array.BYTES_PER_ELEMENT;
-        var vertexSize = (4 + 2) * Float32Array.BYTES_PER_ELEMENT;
-
-        // draw
-        var stride = 4 * Float32Array.BYTES_PER_ELEMENT;
-        gl.bindBuffer(gl.ARRAY_BUFFER, gMRTFinalQuadBuffer)
-        gl.vertexAttribPointer(vertexAttrib, 4, gl.FLOAT, false, vertexSize, 0);
-        gl.vertexAttribPointer(uvAttrib, 2, gl.FLOAT, false, vertexSize, stride);
-
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
-    }
-
-    gl.disable(gl.DEPTH_TEST);
-    drawCrossHair(gCrossHairInfo[0], gCrossHairInfo[1]);
-    for (var i = 0; i < gaMRTQuadBuffer.length; i++) {
-        drawQuad(gaMRTQuadBuffer[i], gaMRTTextures[i]);
-    }
-
-    drawQuad(gLightViewQuadBuffer, gLightViewTexture);
-    gl.enable(gl.DEPTH_TEST);
-}
 
 /*
 **
@@ -1915,9 +1572,224 @@ function createTextures2(textureNames, callBack)
 /*
 **
 */
-function drawFromLight()
+function drawScene(shaderName, newFrameBuffer, camera)
 {
     var oldFB = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, newFrameBuffer);
+
+    var shader = gShaderManager.getShaderProgram(shaderName);
+    if (shader == null) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, oldFB);
+        return;
+    }
+
+    gl.useProgram(shader.program);
+    var shader = gShaderManager.getShaderProgram(shaderName);
+    if (shader) {
+        gl.useProgram(shader.program);
+
+        // uniforms
+        var modelMatrixUniform = gl.getUniformLocation(shader.program, "modelMatrix");
+        var viewMatrixUniform = gl.getUniformLocation(shader.program, 'viewMatrix');
+        var projectionMatrixUniform = gl.getUniformLocation(shader.program, 'projMatrix');
+        var normalMatrixUniform = gl.getUniformLocation(shader.program, 'normMatrix');
+        var cameraTangentMatrixUniform = gl.getUniformLocation(shader.program, 'cameraTangentMatrix');
+
+        // vertex attribs (position and normal)
+        var vertexAttrib = gl.getAttribLocation(shader.program, "position");
+        var normalAttrib = gl.getAttribLocation(shader.program, "normal");
+        var uvAttrib = gl.getAttribLocation(shader.program, "uv");
+
+        gl.enableVertexAttribArray(vertexAttrib);
+
+        if (normalAttrib >= 0) {
+            gl.enableVertexAttribArray(normalAttrib);
+        }
+
+        if (uvAttrib >= 0) {
+            gl.enableVertexAttribArray(uvAttrib);
+        }
+
+        // texture uniforms
+        var tex0Uniform = gl.getUniformLocation(shader.program, 'albedoSampler');
+        var tex1Uniform = gl.getUniformLocation(shader.program, 'metalnessSampler');
+        var tex2Uniform = gl.getUniformLocation(shader.program, 'roughnessSampler');
+        var tex3Uniform = gl.getUniformLocation(shader.program, 'normalSampler');
+
+        if (tex0Uniform && tex1Uniform && tex2Uniform && tex3Uniform) {
+            gl.uniform1i(tex0Uniform, 0);
+            gl.uniform1i(tex1Uniform, 1);
+            gl.uniform1i(tex2Uniform, 2);
+            gl.uniform1i(tex3Uniform, 3);
+        }
+
+        var stride = 3 * Float32Array.BYTES_PER_ELEMENT;
+        if (viewMatrixUniform) {
+            gl.uniformMatrix4fv(viewMatrixUniform, false, new Float32Array(camera.viewMatrix.entries));
+        }
+
+        if (projectionMatrixUniform) {
+            gl.uniformMatrix4fv(projectionMatrixUniform, false, new Float32Array(camera.projectionMatrix.entries));
+        }
+
+        if (cameraTangentMatrixUniform) {
+            // camera tangent space
+            var up = new Vector3(0.0, 1.0, 0.0);
+            var zAxis = camera.lookAt.subtract(camera.position);
+            zAxis.normalize();
+            var xAxis = up.cross(zAxis);
+            var yAxis = zAxis.cross(xAxis);
+            xAxis.normalize();
+            yAxis.normalize();
+
+            var cameraTangentMatrix = new Matrix44();
+            cameraTangentMatrix.entries[0] = xAxis.x;
+            cameraTangentMatrix.entries[1] = xAxis.y;
+            cameraTangentMatrix.entries[2] = xAxis.z;
+            cameraTangentMatrix.entries[4] = yAxis.x;
+            cameraTangentMatrix.entries[5] = yAxis.y;
+            cameraTangentMatrix.entries[6] = yAxis.z;
+            cameraTangentMatrix.entries[7] = zAxis.x;
+            cameraTangentMatrix.entries[8] = zAxis.y;
+            cameraTangentMatrix.entries[9] = zAxis.z;
+
+            gl.uniformMatrix4fv(cameraTangentMatrixUniform, false, new Float32Array(cameraTangentMatrix.entries));
+        }
+
+        gl.clearColor(0.0, 0.0, 0.0, 0.0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        {
+            var allModels = [gDVA];
+            var allModelMatrices = [];
+            var allNormalMatrices = [];
+            for (var i = 0; i < allModels.length; i++) {
+                // rotation
+                var matRotY = new Matrix44();
+                matRotY.rotateY(3.14159 * 1.87);
+                var matRotX = new Matrix44();
+                matRotX.rotateX(0.15);
+                var totalRot = matRotX.multiply(matRotY);
+
+                // translation
+                var matTrans = new Matrix44();
+                var posX = ((i - allModelMatrices.length / 2) + i);
+                matTrans.translate(posX, 0.0, 0.0);
+
+                // scaling
+                var matScale = new Matrix44();
+                matScale.scale(3.0, 3.0, 3.0);
+                var matTransRot = matTrans.multiply(totalRot);
+
+                // total
+                var matModel = matScale.multiply(matTransRot);
+                allModelMatrices.push(matModel);
+                allNormalMatrices.push(totalRot);
+            }
+
+            drawCharacters(
+                allModels,
+                allModelMatrices,
+                allNormalMatrices,
+                modelMatrixUniform,
+                normalMatrixUniform,
+                vertexAttrib,
+                normalAttrib,
+                uvAttrib,
+                true,
+                0);
+        }
+
+        // pistol
+        {
+            var matRotX = new Matrix44();
+            var matRotY = new Matrix44();
+            var matRotZ = new Matrix44();
+            var matRotYX = new Matrix44();
+            var matRotZYX = new Matrix44();
+            var matTrans = new Matrix44();
+
+            matRotX.rotateX(gLookAngleY);
+            matRotY.rotateY(gLookAngleX)
+            matRotZ.rotateZ(Math.PI);
+            matRotYX = matRotY.multiply(matRotX);
+            matRotZYX = matRotZ.multiply(matRotYX);
+            matTrans.translate(2.0, 1.0, 0.0);
+            //var matModel = matTrans.multiply(matRotZYX);
+
+            //var mat0 = cameraTangentMatrix.multiply(matTrans);
+            var matModel = matTrans.multiply(matRotYX); // matRotZYX.multiply(mat0);
+
+            drawCharacters(
+                [gPistol],
+                [matTrans],
+                [new Matrix44()],
+                modelMatrixUniform,
+                normalMatrixUniform,
+                vertexAttrib,
+                normalAttrib,
+                uvAttrib,
+                true,
+                0);
+        }
+
+
+        // ground
+        (function drawGround()
+        {
+            if (gGround.textures == null)
+            {
+                return;
+            }
+
+            var stride = 3 * Float32Array.BYTES_PER_ELEMENT;
+            for (var i = 0; i < gGround.textures.length; i++)
+            {
+                gl.activeTexture(gl.TEXTURE0 + i);
+                gl.bindTexture(gl.TEXTURE_2D, gGround.textures[i]);
+            }
+
+            // matrix uniforms
+            var matrix = new Matrix44();
+            if (modelMatrixUniform) {
+                gl.uniformMatrix4fv(modelMatrixUniform, false, new Float32Array(matrix.entries));
+            }
+
+            if (normalMatrixUniform) {
+                gl.uniformMatrix4fv(normalMatrixUniform, false, new Float32Array(matrix.entries));
+            }
+
+            // vertex attribs (position and normal)
+            var vertexAttrib = gl.getAttribLocation(shader.program, "position");
+            var normalAttrib = gl.getAttribLocation(shader.program, "normal");
+            var uvAttrib = gl.getAttribLocation(shader.program, "uv");
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, gGround.vbo)
+            gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 32, 0);
+            if (normalAttrib >= 0) {
+                gl.vertexAttribPointer(normalAttrib, 3, gl.FLOAT, false, 32, stride);
+            }
+
+            if (uvAttrib >= 0) {
+                gl.vertexAttribPointer(uvAttrib, 2, gl.FLOAT, false, 32, stride + stride);
+            }
+
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+        })();
+
+        gl.clearColor(0.0, 0.0, 0.5, 1.0);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, oldFB);
+
+    }   // if valid shader 
+}
+
+/*
+**
+*/
+function drawFromLight()
+{
+    /*var oldFB = gl.getParameter(gl.FRAMEBUFFER_BINDING);
     gl.bindFramebuffer(gl.FRAMEBUFFER, gLightViewFrameBuffer);
 
     var shader = gShaderManager.getShaderProgram('shadowmap');
@@ -1941,9 +1813,6 @@ function drawFromLight()
     var matTrans = new Matrix44();
     matTrans.translate(0.0, 0.0, 0.0);
     var matModel = matTrans.multiply(totalRot);
-
-    var componentCount = 0;
-    var count = 0;
 
     if (shader) {
         gl.useProgram(shader.program);
@@ -2006,38 +1875,6 @@ function drawFromLight()
 
         drawCharacters(allModels, allModelMatrices, modelMatrixUniform, vertexAttrib, null, null, false, 0);
 
-        /*for (var i = 0; i < gaMaterialModels.length; i++) {
-            var materialModel = gaMaterialModels[i];
-
-            var matRotY = new Matrix44();
-            var matRotX = new Matrix44();
-            matRotY.rotateY(Math.PI * 1.87);
-            matRotX.rotateX(0.15);
-
-            var totalRot = matRotX.multiply(matRotY);
-            var matTrans = new Matrix44();
-
-            var posX = ((i - gaMaterialModels.length / 2) + i) * 1.5;
-
-            matTrans.translate(posX, 0.0, 0.0);
-            var matModel = matTrans.multiply(totalRot);
-
-            // matrix uniforms
-            if (modelMatrixUniform) {
-                gl.uniformMatrix4fv(modelMatrixUniform, false, new Float32Array(matModel.entries));
-            }
-
-            // set texture and draw
-            for (var j = 0; j < materialModel.models.length; j++) {
-                var model = materialModel.models[j];
-
-                gl.bindBuffer(gl.ARRAY_BUFFER, model.vbo)
-                gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 32, 0);
-                gl.drawArrays(gl.TRIANGLES, 0, model.floatArray.length / 8);
-            }
-
-        }   // for i = 0 to num models*/
-
         // ground
         (function drawGround() {
             
@@ -2055,5 +1892,324 @@ function drawFromLight()
     gl.clearColor(0.0, 0.0, 0.5, 1.0);
     gl.bindFramebuffer(gl.FRAMEBUFFER, oldFB);
 
-    gl.cullFace(gl.BACK);
+    gl.cullFace(gl.BACK);*/
+
+    var up = new Vector3(0.0, 1.0, 0.0);
+    var lookAt = gLightViewCamera.lookAt.subtract(gCamera.position);
+    lookAt.normalize();
+    if (Math.abs(lookAt.y) >= 0.9999) {
+        up.x = 0.0; up.y = 0.0; up.z = 1.0;
+    }
+
+    gLightViewCamera.update(up, 50.0, 1.0, 500.0, 500.0);
+
+    drawScene('shadowmap', gLightViewFrameBuffer, gLightViewCamera);
+}
+
+/*
+**
+*/
+function drawMRT(shaderName) {
+    /*var oldFB = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, gMRTFramebuffer);
+
+    var shader = gShaderManager.getShaderProgram(shaderName);
+    if (shader == null) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, oldFB);
+        return;
+    }
+
+    gl.useProgram(shader.program);
+
+    var shader = gShaderManager.getShaderProgram(shaderName);
+    if (shader) {
+        gl.useProgram(shader.program);
+
+        // uniforms
+        var modelMatrixUniform = gl.getUniformLocation(shader.program, "modelMatrix");
+        var viewMatrixUniform = gl.getUniformLocation(shader.program, 'viewMatrix');
+        var projectionMatrixUniform = gl.getUniformLocation(shader.program, 'projMatrix');
+        var normalMatrixUniform = gl.getUniformLocation(shader.program, 'normMatrix');
+        var cameraTangentMatrixUniform = gl.getUniformLocation(shader.program, 'cameraTangentMatrix');
+
+        // vertex attribs (position and normal)
+        var vertexAttrib = gl.getAttribLocation(shader.program, "position");
+        var normalAttrib = gl.getAttribLocation(shader.program, "normal");
+        var uvAttrib = gl.getAttribLocation(shader.program, "uv");
+
+        gl.enableVertexAttribArray(vertexAttrib);
+        gl.enableVertexAttribArray(normalAttrib);
+        gl.enableVertexAttribArray(uvAttrib);
+
+        var tex0Uniform = gl.getUniformLocation(shader.program, 'albedoSampler');
+        var tex1Uniform = gl.getUniformLocation(shader.program, 'metalnessSampler');
+        var tex2Uniform = gl.getUniformLocation(shader.program, 'roughnessSampler');
+        var tex3Uniform = gl.getUniformLocation(shader.program, 'normalSampler');
+
+        gl.uniform1i(tex0Uniform, 0);
+        gl.uniform1i(tex1Uniform, 1);
+        gl.uniform1i(tex2Uniform, 2);
+        gl.uniform1i(tex3Uniform, 3);
+
+        var stride = 3 * Float32Array.BYTES_PER_ELEMENT;
+        if (viewMatrixUniform) {
+            gl.uniformMatrix4fv(viewMatrixUniform, false, new Float32Array(gCamera.viewMatrix.entries));
+        }
+
+        if (projectionMatrixUniform) {
+            gl.uniformMatrix4fv(projectionMatrixUniform, false, new Float32Array(gCamera.projectionMatrix.entries));
+        }
+
+        if (cameraTangentMatrixUniform) {
+            // camera tangent space
+            var up = new Vector3(0.0, 1.0, 0.0);
+            var zAxis = gCamera.lookAt.subtract(gCamera.position);
+            zAxis.normalize();
+            var xAxis = up.cross(zAxis);
+            var yAxis = zAxis.cross(xAxis);
+            xAxis.normalize();
+            yAxis.normalize();
+
+            var cameraTangentMatrix = new Matrix44();
+            cameraTangentMatrix.entries[0] = xAxis.x;
+            cameraTangentMatrix.entries[1] = xAxis.y;
+            cameraTangentMatrix.entries[2] = xAxis.z;
+            cameraTangentMatrix.entries[4] = yAxis.x;
+            cameraTangentMatrix.entries[5] = yAxis.y;
+            cameraTangentMatrix.entries[6] = yAxis.z;
+            cameraTangentMatrix.entries[7] = zAxis.x;
+            cameraTangentMatrix.entries[8] = zAxis.y;
+            cameraTangentMatrix.entries[9] = zAxis.z;
+
+            gl.uniformMatrix4fv(cameraTangentMatrixUniform, false, new Float32Array(cameraTangentMatrix.entries));
+        }
+
+        gl.clearColor(0.0, 0.0, 0.0, 0.0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        var allModels = [gDVA];
+
+        {
+            var allModelMatrices = [];
+            var allNormalMatrices = [];
+            for (var i = 0; i < allModels.length; i++) {
+                // rotation
+                var matRotY = new Matrix44();
+                matRotY.rotateY(3.14159 * 1.87);
+                var matRotX = new Matrix44();
+                matRotX.rotateX(0.15);
+                var totalRot = matRotX.multiply(matRotY);
+
+                // translation
+                var matTrans = new Matrix44();
+                var posX = ((i - allModelMatrices.length / 2) + i);
+                matTrans.translate(posX, 0.0, 0.0);
+
+                // scaling
+                var matScale = new Matrix44();
+                matScale.scale(3.0, 3.0, 3.0);
+                var matTransRot = matTrans.multiply(totalRot);
+
+                // total
+                var matModel = matScale.multiply(matTransRot);
+                allModelMatrices.push(matModel);
+                allNormalMatrices.push(totalRot);
+            }
+
+            drawCharacters(
+                allModels,
+                allModelMatrices,
+                allNormalMatrices,
+                modelMatrixUniform,
+                normalMatrixUniform,
+                vertexAttrib,
+                normalAttrib,
+                uvAttrib,
+                true,
+                0);
+        }
+
+        {
+            var matRotX = new Matrix44();
+            var matRotZ = new Matrix44();
+            var matRotZX = new Matrix44();
+            var matTrans = new Matrix44();
+
+            matRotX.rotateX(Math.PI * 0.5);
+            matRotZ.rotateZ(Math.PI);
+            matRotZX = matRotZ.multiply(matRotX);
+            matTrans.translate(-2.0, 1.0, 1.0);
+            var matModel = matRotZX.multiply(matTrans);
+
+            drawCharacters(
+                [gPistol],
+                [matModel],
+                [matRotZX],
+                modelMatrixUniform,
+                normalMatrixUniform,
+                vertexAttrib,
+                normalAttrib,
+                uvAttrib,
+                true,
+                0);
+        }
+
+
+        // ground
+        (function drawGround()
+        {
+            if (gGround.textures == null)
+            {
+                return;
+            }
+
+            var stride = 3 * Float32Array.BYTES_PER_ELEMENT;
+            for (var i = 0; i < gGround.textures.length; i++)
+            {
+                gl.activeTexture(gl.TEXTURE0 + i);
+                gl.bindTexture(gl.TEXTURE_2D, gGround.textures[i]);
+            }
+
+            var matrix = new Matrix44();
+
+            // matrix uniforms
+            if (modelMatrixUniform) {
+                gl.uniformMatrix4fv(modelMatrixUniform, false, new Float32Array(matrix.entries));
+            }
+
+            if (normalMatrixUniform) {
+                gl.uniformMatrix4fv(normalMatrixUniform, false, new Float32Array(matrix.entries));
+            }
+
+            // vertex attribs (position and normal)
+            var vertexAttrib = gl.getAttribLocation(shader.program, "position");
+            var normalAttrib = gl.getAttribLocation(shader.program, "normal");
+            var uvAttrib = gl.getAttribLocation(shader.program, "uv");
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, gGround.vbo)
+            gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 32, 0);
+            gl.vertexAttribPointer(normalAttrib, 3, gl.FLOAT, false, 32, stride);
+            gl.vertexAttribPointer(uvAttrib, 2, gl.FLOAT, false, 32, stride + stride);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+        })();
+
+    }   // if valid shader 
+
+    gl.clearColor(0.0, 0.0, 0.5, 1.0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, oldFB);
+    */
+
+    drawScene('mrt', gMRTFramebuffer, gCamera);
+}
+
+
+/*
+**
+*/
+function drawMRTFinal(quadBuffer) {
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    var shader = gShaderManager.getShaderProgram('mrt_pbr');
+    if (shader != null) {
+        gl.useProgram(shader.program);
+
+        // light view camera matrix
+        var lightViewMatrixUniform = gl.getUniformLocation(shader.program, 'lightViewMatrix');
+        var lightProjectionMatrixUniform = gl.getUniformLocation(shader.program, 'lightProjectionMatrix');
+        gl.uniformMatrix4fv(lightViewMatrixUniform, false, new Float32Array(gLightViewCamera.viewMatrix.entries));
+        gl.uniformMatrix4fv(lightProjectionMatrixUniform, false, new Float32Array(gLightViewCamera.projectionMatrix.entries));
+
+        // sampling and eye coordinates uniforms
+        var sampleCoordUniform = gl.getUniformLocation(shader.program, 'afSamplePos');
+        var eyeCoordUniform = gl.getUniformLocation(shader.program, 'eyePos');
+        var lookDirUniform = gl.getUniformLocation(shader.program, 'lookDir');
+
+        var lookDir = gCamera.lookAt.subtract(gCamera.position);
+        lookDir.normalize();
+        gl.uniform3f(lookDirUniform, lookDir.x, lookDir.y, lookDir.z);
+
+        var samplePos = getSampleCoords(128);
+        gl.uniform2fv(sampleCoordUniform, new Float32Array(samplePos));
+        gl.uniform3f(eyeCoordUniform, gCamera.position.x, gCamera.position.y, gCamera.position.z);
+
+        // attribs (position and uv)
+        var vertexAttrib = gl.getAttribLocation(shader.program, "position");
+        gl.enableVertexAttribArray(vertexAttrib);
+
+        var uvAttrib = gl.getAttribLocation(shader.program, "uv");
+        gl.enableVertexAttribArray(uvAttrib);
+
+        var samplerNames =
+        [
+            'environmentSampler',
+            'normalMap',
+            'clipSpaceMap',
+            'worldSpaceMap',
+            'albedoMap',
+            'normalSampler',
+            'metalRoughnessMap',
+        ];
+
+        // texture map samplers
+        var uniforms = [];
+        for (var i = 0; i < samplerNames.length; i++) {
+            uniforms.push(gl.getUniformLocation(shader.program, samplerNames[i]));
+            gl.uniform1i(uniforms[i], i);
+        }
+
+        var lightViewUniform = gl.getUniformLocation(shader.program, 'lightViewDepthMap');
+        gl.uniform1i(lightViewUniform, samplerNames.length);
+
+        //var MRTEnum =
+        //{
+        //    NORMAL: 0,
+        //    CLIPSPACE: 1,
+        //    WORLDSPACE: 2,
+        //    ALBEDO: 3,
+        //    NORMALMAP: 4,
+        //    METAL_ROUGHNESS: 5,
+        //};
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, gEnvMap);
+
+        for (var i = 0; i <= MRTEnum.NUM_MRT; i++) {
+            gl.activeTexture(gl.TEXTURE0 + i + 1);
+            gl.bindTexture(gl.TEXTURE_2D, gaMRTTextures[i]);
+        }
+
+        gl.activeTexture(gl.TEXTURE0 + samplerNames.length);
+        gl.bindTexture(gl.TEXTURE_2D, gLightViewTexture);
+
+        var stride = 4 * Float32Array.BYTES_PER_ELEMENT;
+        var vertexSize = (4 + 2) * Float32Array.BYTES_PER_ELEMENT;
+
+        // draw
+        var stride = 4 * Float32Array.BYTES_PER_ELEMENT;
+        gl.bindBuffer(gl.ARRAY_BUFFER, gMRTFinalQuadBuffer)
+        gl.vertexAttribPointer(vertexAttrib, 4, gl.FLOAT, false, vertexSize, 0);
+        gl.vertexAttribPointer(uvAttrib, 2, gl.FLOAT, false, vertexSize, stride);
+
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
+
+    gl.disable(gl.DEPTH_TEST);
+    drawCrossHair(gCrossHairInfo[0], gCrossHairInfo[1]);
+    for (var i = 0; i < gaMRTQuadBuffer.length; i++) {
+        drawQuad(gaMRTQuadBuffer[i], gaMRTTextures[i]);
+    }
+
+    drawQuad(gLightViewQuadBuffer, gLightViewTexture);
+    gl.enable(gl.DEPTH_TEST);
+}
+
+/*
+**
+*/
+function loadData() {
+    loadCharacter('http://localhost:8000/models/pokeball/pokeball.xml',
+        function (character) {
+            gPistol = character;
+        });
 }

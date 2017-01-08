@@ -13,7 +13,7 @@ varying vec4 vClipSpacePos;
 
 void main()
 {
-	vNorm = vec4(normal, 1.0);
+	vNorm = normMatrix * vec4(normal, 1.0);
 	vWorldPos = modelMatrix * vec4(position, 1.0);
 	vUV = vec4(uv.xy, 0.0, 1.0);
 	vec4 clipSpace = projMatrix * viewMatrix * modelMatrix * vec4(position, 1.0);

@@ -406,8 +406,8 @@ void main()
 		return;
 	}
 
-	float fRoughness = metalRoughness.x;
-	float fMetalVal = metalRoughness.y;
+	float fMetalVal = metalRoughness.x;
+	float fRoughness = metalRoughness.y;
 	float fRefract = 0.3;
 
 	// tangent space vectors
@@ -437,6 +437,8 @@ void main()
 	
 	vec3 lightPos = vec3(4.0, 10.0, 10.0);
 	
+//albedo.xyz = vec3(1.0);
+
 	// specular
 	vec3 specularColor = computeSpecular(
 		albedo.xyz,
@@ -450,10 +452,12 @@ void main()
 	vec3 lightV = normalize(lightPos - worldPos.xyz);
 	vec3 diffuseColor = vec3(clamp(dot(worldSpaceNormal3, lightV), 0.0, 1.0));
 
+fMetalVal = 1.0;
+
 	vec3 diffuse = (iblDiffuse + diffuseColor) * (1.0 - fMetalVal) * albedo.xyz;
 	vec3 specular = (specularColor + iblSpecular.color * albedo.xyz) * fMetalVal;
-	vec3 color =  diffuse + specular;
+	vec3 color =  /*diffuse + */specular;
 	gl_FragColor = vec4(color, 1.0); 
-	gl_FragColor *= inShadow(worldPos);
+	//gl_FragColor *= inShadow(worldPos);
 	
 }
