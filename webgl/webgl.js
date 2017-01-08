@@ -455,7 +455,7 @@ function initGL()
         */
         gCamera = new Camera(new Vector3(0.0, 1.0, -2.0), new Vector3(0.0, 0.0, 100.0));
         //gCamera = new Camera(new Vector3(5.0, 10.0, 5.0), new Vector3(0.0, 0.0, 0.0));
-        gLightViewCamera = new Camera(new Vector3(5.0, 10.0, 5.0), new Vector3(0.0, 0.0, 0.0));
+        gLightViewCamera = new Camera(new Vector3(4.0, 10.0, -10.0), new Vector3(0.0, 0.0, 0.0));
 
         window.setInterval(handleKeyboard, 16);
         window.addEventListener('keydown', onKeyDown);
@@ -1837,6 +1837,11 @@ function drawMRTFinal(quadBuffer) {
         var samplePos = getSampleCoords(128);
         gl.uniform2fv(sampleCoordUniform, new Float32Array(samplePos));
         gl.uniform3f(eyeCoordUniform, gCamera.position.x, gCamera.position.y, gCamera.position.z);
+
+        var lightPositionUniform = gl.getUniformLocation(shader.program, 'lightPosition');
+        if (lightPositionUniform) {
+            gl.uniform3f(lightPositionUniform, gLightViewCamera.position.x, gLightViewCamera.position.y, gLightViewCamera.position.z);
+        }
 
         // attribs (position and uv)
         var vertexAttrib = gl.getAttribLocation(shader.program, "position");

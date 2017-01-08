@@ -14,6 +14,7 @@ uniform sampler2D		lightViewDepthMap;
 uniform vec2			afSamplePos[NUM_SAMPLES];
 uniform vec3			eyePos;
 uniform vec3			lookDir;
+uniform vec3			lightPosition;
 
 uniform mat4			lightViewMatrix;
 uniform mat4			lightProjectionMatrix;
@@ -408,7 +409,7 @@ void main()
 
 	float fMetalVal = metalRoughness.x;
 	float fRoughness = metalRoughness.y;
-	float fRefract = 0.3;
+	float fRefract = 0.9;
 
 	// tangent space vectors
 	vec3 up = vec3(0.0, 0.0, 1.0);
@@ -435,9 +436,7 @@ void main()
 	vec3 view = -normalize(clipSpace.xyz);
 	IBLSpecularOut iblSpecular = brdf(worldSpaceNormal3, fRoughness, fRefract, view);
 	
-	vec3 lightPos = vec3(4.0, 10.0, 10.0);
-	
-//albedo.xyz = vec3(1.0);
+	//vec3 lightPos = vec3(4.0, 10.0, -10.0);
 
 	// specular
 	vec3 specularColor = computeSpecular(
@@ -447,17 +446,19 @@ void main()
 		fRoughness,
 		fRefract,
 		view,
-		lightPos);
+		lightPosition);
 
-	vec3 lightV = normalize(lightPos - worldPos.xyz);
+	vec3 lightV = normalize(lightPosition - worldPos.xyz);
 	vec3 diffuseColor = vec3(clamp(dot(worldSpaceNormal3, lightV), 0.0, 1.0));
 
-fMetalVal = 1.0;
+	//fMetalVal = 1.0;
 
-	vec3 diffuse = (iblDiffuse + diffuseColor) * (1.0 - fMetalVal) * albedo.xyz;
-	vec3 specular = (specularColor + iblSpecular.color * albedo.xyz) * fMetalVal;
+	//vec3 diffuse = (diffuseColor * iblDiffuse) * (1.0 - fMetalVal) * albedo.xyz;
+	vec3 diffuse = (diffuseColor + iblDiffuse) * (1.0 - fMetalVal) * albedo.xyz;
+	vec3 specular = (specularColor + (iblSpecular.color / 3.14159)) * fMetalVal;
 	vec3 color =  diffuse + specular;
 	gl_FragColor = vec4(color, 1.0); 
-	//gl_FragColor *= inShadow(worldPos);
+	//gl_FragColor = vec4(fMetalVal, fMetalVal, fMetalVal, 1.0);
+	gl_FragColor *= inShadow(worldPos);
 	
 }
