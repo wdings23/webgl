@@ -379,6 +379,70 @@ vec3 computeSpecular(
 /*
 **
 */
+vec3 hbao()
+{
+	const float fNumDirections = 24.0;
+	const float fOneOverTwoPI = 1.0 / (2.0 * 3.14159);
+	const float fOneOverNumDirections = 1.0 / fNumDirections;
+	const float fAngleThreshold = 3.14159 / 200.0;
+	const float fOneOverFrameBufferWidth = 1.0 / 640.0;
+	const float fOneOverFrameBufferHeight = 1.0 / 384.0;
+	const float fNumAdjacentUV = 5.0;
+	const float fShortestTestDistance = 1.0;
+
+	vec3 worldSpace = texture2D(worldSpaceMap, vUV).xyz;
+	vec3 normal = texture2D(normalMap, vUV).xyz;
+	float fTotalValue = 0.0;
+	float fSavedSamples = 0.0;
+
+	vec3 ret = vec3(1.0, 1.0, 1.0);
+	for(float i = 0.0; i < fNumDirections; i++)
+	{
+		float fAngle = i * fOneOverNumDirections * 2.0 * 3.14159; 
+		float fCosAngle = cos(fAngle);
+		float fSinAngle = sin(fAngle);
+
+		for(float j = 1.0; j <= fNumAdjacentUV; j++)
+		{
+			vec2 sampleV = vec2(j, 0.0);
+
+			vec2 samplePt = vec2(fCosAngle * sampleV.x, fSinAngle * sampleV.x);
+			vec2 sampleUV = vec2(vUV.x + samplePt.x * fOneOverFrameBufferWidth, vUV.y + samplePt.y * fOneOverFrameBufferHeight);
+			vec3 sampleWorldSpace = texture2D(worldSpaceMap, sampleUV).xyz;
+
+			float fLength = length(sampleWorldSpace - worldSpace);
+			if(fLength <= fShortestTestDistance)
+			{
+				vec3 sampleDir = normalize(sampleWorldSpace - worldSpace);
+
+				float fSampleAngle = 3.14159 * 0.5 - acos(dot(sampleDir, normal));
+				if(fSampleAngle > fAngleThreshold)
+				{
+					float fValue = fSampleAngle - fAngleThreshold;
+					float fAttenuation = fShortestTestDistance - fLength;
+					fValue *= (0.02 * fAttenuation);
+					ret.xyz -= fValue;
+				}
+			}
+		}
+	}
+
+	float fX = ret.x;
+	if(fX > 0.8)
+	{
+		ret.x = 1.0;
+		ret.y = 1.0;
+		ret.z = 1.0;
+	}
+
+	clamp(ret.xyz, 0.0, 1.0);
+
+	return ret;
+}
+
+/*
+**
+*/
 void main()
 {
 	/*uniform samplerCube		environmentSampler;
@@ -440,7 +504,7 @@ void main()
 
 	// specular
 	vec3 specularColor = computeSpecular(
-		albedo.xyz,
+		vec3(1.0), //albedo.xyz,
 		worldPos.xyz,
 		worldSpaceNormal3,
 		fRoughness,
@@ -455,10 +519,10 @@ void main()
 
 	//vec3 diffuse = (diffuseColor * iblDiffuse) * (1.0 - fMetalVal) * albedo.xyz;
 	vec3 diffuse = (diffuseColor + iblDiffuse) * (1.0 - fMetalVal) * albedo.xyz;
-	vec3 specular = (specularColor + (iblSpecular.color / 3.14159)) * fMetalVal;
+	vec3 specular = (specularColor + (iblSpecular.color)) * fMetalVal;
 	vec3 color =  diffuse + specular;
-	gl_FragColor = vec4(color, 1.0); 
-	//gl_FragColor = vec4(fMetalVal, fMetalVal, fMetalVal, 1.0);
-	gl_FragColor *= inShadow(worldPos);
-	
+	vec3 ao = hbao();
+	//gl_FragColor = vec4(color, 1.0); 
+	//gl_FragColor *= inShadow(worldPos);
+	gl_FragColor = vec4(ao, 1.0);
 }

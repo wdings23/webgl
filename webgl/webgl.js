@@ -24,6 +24,7 @@ var gLightViewCamera;
 
 var gDVA;
 var gPistol = null;
+var gSky;
 
 var gLightViewFrameBuffer = null;
 var gGround = {vbo: null, textures: null};
@@ -455,7 +456,7 @@ function initGL()
         */
         gCamera = new Camera(new Vector3(0.0, 1.0, -2.0), new Vector3(0.0, 0.0, 100.0));
         //gCamera = new Camera(new Vector3(5.0, 10.0, 5.0), new Vector3(0.0, 0.0, 0.0));
-        gLightViewCamera = new Camera(new Vector3(4.0, 10.0, -10.0), new Vector3(0.0, 0.0, 0.0));
+        gLightViewCamera = new Camera(new Vector3(-6.0, 10.0, 4.0), new Vector3(0.0, 0.0, 0.0));
 
         window.setInterval(handleKeyboard, 16);
         window.addEventListener('keydown', onKeyDown);
@@ -603,6 +604,7 @@ function tick()
 /*
 **
 */
+var gfMult = 1.0;
 function update()
 {
     var up = new Vector3(0.0, 1.0, 0.0);
@@ -614,6 +616,21 @@ function update()
     }
 
     gCamera.update(up, 100.0, 0.5, 500.0, 500.0);
+
+    /*gLightViewCamera.position.z += (0.01 * gfMult);
+    if (Math.abs(gLightViewCamera.position.z) > 10.0)
+    {
+        gfMult *= -1.0;
+    }*/
+
+    var up = new Vector3(0.0, 1.0, 0.0);
+    var lookAt = gLightViewCamera.lookAt.subtract(gLightViewCamera.position);
+    lookAt.normalize();
+    if (Math.abs(lookAt.y) >= 0.9999) {
+        up.x = 0.0; up.y = 0.0; up.z = 1.0;
+    }
+
+    gLightViewCamera.update(up, 50.0, 1.0, 500.0, 500.0);
 }
 
 /*
@@ -979,10 +996,10 @@ function createSphere(radius, centerX, centerY, centerZ, numSegments)
             var bottomY1 = ((halfSegments - nextIndexI) / halfSegments) * halfPI * yMult;
             var bottomZ1 = bottomRadius * circlePos[nextIndexJ].z;
 
-            topY0 = Math.sin(topY0);
-            topY1 = Math.sin(topY1);
-            bottomY0 = Math.sin(bottomY0);
-            bottomY1 = Math.sin(bottomY1);
+            topY0 = Math.sin(topY0) * radius;
+            topY1 = Math.sin(topY1) * radius;
+            bottomY0 = Math.sin(bottomY0) * radius;
+            bottomY1 = Math.sin(bottomY1) * radius;
 
             // 0 --- 2
             // |  / |
@@ -1778,7 +1795,67 @@ function drawScene(shaderName, newFrameBuffer, camera)
 
         })();
 
-        gl.clearColor(0.0, 0.0, 0.5, 1.0);
+        (function drawSky() {
+            var shader = gShaderManager.getShaderProgram('sky');
+            if (shader == null) {
+                gl.bindFramebuffer(gl.FRAMEBUFFER, oldFB);
+                return;
+            }
+
+            if (gEnvMap == null)
+            {
+                return;
+            }
+
+            gl.useProgram(shader.program);
+            
+            gl.disable(gl.CULL_FACE);
+
+            var modelMatrixUniform = gl.getUniformLocation(shader.program, "modelMatrix");
+            var viewMatrixUniform = gl.getUniformLocation(shader.program, 'viewMatrix');
+            var projectionMatrixUniform = gl.getUniformLocation(shader.program, 'projMatrix');
+
+            if (viewMatrixUniform) {
+                gl.uniformMatrix4fv(viewMatrixUniform, false, new Float32Array(camera.viewMatrix.entries));
+            }
+
+            if (projectionMatrixUniform) {
+                gl.uniformMatrix4fv(projectionMatrixUniform, false, new Float32Array(camera.projectionMatrix.entries));
+            }
+
+            var matrix = new Matrix44();
+            if (modelMatrixUniform) {
+                gl.uniformMatrix4fv(modelMatrixUniform, false, new Float32Array(matrix.entries));
+            }
+
+            // texture uniform
+            var tex0Uniform = gl.getUniformLocation(shader.program, 'textureSampler');
+            gl.uniform1i(tex0Uniform, 0);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_CUBE_MAP, gEnvMap);
+
+            // vertex attribs (position and normal)
+            var vertexAttrib = gl.getAttribLocation(shader.program, "position");
+            var normalAttrib = gl.getAttribLocation(shader.program, "normal");
+            var uvAttrib = gl.getAttribLocation(shader.program, "uv");
+
+            var stride = 3 * Float32Array.BYTES_PER_ELEMENT;
+            gl.bindBuffer(gl.ARRAY_BUFFER, gSky.vbo)
+            gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 32, 0);
+            if (normalAttrib >= 0) {
+                gl.vertexAttribPointer(normalAttrib, 3, gl.FLOAT, false, 32, stride);
+            }
+
+            if (uvAttrib >= 0) {
+                gl.vertexAttribPointer(uvAttrib, 2, gl.FLOAT, false, 32, stride + stride);
+            }
+
+            gl.drawArrays(gl.TRIANGLES, 0, gSky.numFaces * 3);
+
+            gl.enable(gl.CULL_FACE);
+
+        })();
+
         gl.bindFramebuffer(gl.FRAMEBUFFER, oldFB);
 
     }   // if valid shader 
@@ -1789,15 +1866,6 @@ function drawScene(shaderName, newFrameBuffer, camera)
 */
 function drawFromLight()
 {
-    var up = new Vector3(0.0, 1.0, 0.0);
-    var lookAt = gLightViewCamera.lookAt.subtract(gCamera.position);
-    lookAt.normalize();
-    if (Math.abs(lookAt.y) >= 0.9999) {
-        up.x = 0.0; up.y = 0.0; up.z = 1.0;
-    }
-
-    gLightViewCamera.update(up, 50.0, 1.0, 500.0, 500.0);
-
     drawScene('shadowmap', gLightViewFrameBuffer, gLightViewCamera);
 }
 
@@ -1922,4 +1990,11 @@ function loadData() {
         function (character) {
             gPistol = character;
         });
+
+    var floatArray = createSphere(30.0, 0.0, 0.0, 0.0, 12);
+
+    gSky = new Model('sky');
+    gSky.floatArray = new Float32Array(floatArray);
+    gSky.updateVBO();
+    gSky.numFaces = (gSky.floatArray.length / 8) / 3;
 }

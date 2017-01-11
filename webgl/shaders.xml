@@ -29,4 +29,9 @@
     <vertex>shadowmap.vs</vertex>
     <fragment>shadowmap.fs</fragment>
   </program>
+  <program>
+    <name>sky</name>
+    <vertex>sky.vs</vertex>
+    <fragment>sky.fs</fragment>
+  </program>
 </shaders>
