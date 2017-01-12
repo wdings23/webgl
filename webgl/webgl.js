@@ -617,11 +617,11 @@ function update()
 
     gCamera.update(up, 100.0, 0.5, 500.0, 500.0);
 
-    /*gLightViewCamera.position.z += (0.01 * gfMult);
-    if (Math.abs(gLightViewCamera.position.z) > 10.0)
+    gLightViewCamera.position.z += (0.01 * gfMult);
+    if (Math.abs(gLightViewCamera.position.z) > 15.0)
     {
         gfMult *= -1.0;
-    }*/
+    }
 
     var up = new Vector3(0.0, 1.0, 0.0);
     var lookAt = gLightViewCamera.lookAt.subtract(gLightViewCamera.position);

@@ -388,7 +388,7 @@ vec3 hbao()
 	const float fOneOverFrameBufferWidth = 1.0 / 640.0;
 	const float fOneOverFrameBufferHeight = 1.0 / 384.0;
 	const float fNumAdjacentUV = 5.0;
-	const float fShortestTestDistance = 1.0;
+	const float fShortestTestDistance = 0.5;
 
 	vec3 worldSpace = texture2D(worldSpaceMap, vUV).xyz;
 	vec3 normal = texture2D(normalMap, vUV).xyz;
@@ -419,22 +419,21 @@ vec3 hbao()
 				if(fSampleAngle > fAngleThreshold)
 				{
 					float fValue = fSampleAngle - fAngleThreshold;
-					float fAttenuation = fShortestTestDistance - fLength;
-					fValue *= (0.02 * fAttenuation);
-					ret.xyz -= fValue;
+					//float fAttenuation = fShortestTestDistance - fLength;
+					//fValue *= fAttenuation;
+					fTotalValue += fValue;
 				}
 			}
 		}
 	}
 
-	float fX = ret.x;
-	if(fX > 0.8)
+	fTotalValue /= (fNumDirections * fNumAdjacentUV);
+	if(fTotalValue <= 0.1)
 	{
-		ret.x = 1.0;
-		ret.y = 1.0;
-		ret.z = 1.0;
+		fTotalValue = 0.0;
 	}
 
+	ret.xyz -= fTotalValue;
 	clamp(ret.xyz, 0.0, 1.0);
 
 	return ret;
@@ -500,11 +499,30 @@ void main()
 	vec3 view = -normalize(clipSpace.xyz);
 	IBLSpecularOut iblSpecular = brdf(worldSpaceNormal3, fRoughness, fRefract, view);
 	
-	//vec3 lightPos = vec3(4.0, 10.0, -10.0);
+	vec3 lightPos1 = vec3(4.0, 8.0, 10.0);
+	vec3 additionalLightPos[2];
+	additionalLightPos[0] = vec3(4.0, 8.0, 10.0); 
+	additionalLightPos[1] = vec3(-4.0, 8.0, -10.0);
+	
+	vec3 additionalLightColor = vec3(0.0, 0.0, 0.0);
+	for(int i = 0; i < 2; i++)
+	{
+		vec3 color = computeSpecular(
+			vec3(0.5),
+			worldPos.xyz,
+			worldSpaceNormal3,
+			fRoughness,
+			fRefract,
+			view,
+			additionalLightPos[i]);
+
+		additionalLightColor += color;
+	}
+
 
 	// specular
-	vec3 specularColor = computeSpecular(
-		vec3(1.0), //albedo.xyz,
+	vec3 specularColor0 = computeSpecular(
+		vec3(0.5),
 		worldPos.xyz,
 		worldSpaceNormal3,
 		fRoughness,
@@ -519,10 +537,10 @@ void main()
 
 	//vec3 diffuse = (diffuseColor * iblDiffuse) * (1.0 - fMetalVal) * albedo.xyz;
 	vec3 diffuse = (diffuseColor + iblDiffuse) * (1.0 - fMetalVal) * albedo.xyz;
-	vec3 specular = (specularColor + (iblSpecular.color)) * fMetalVal;
+	vec3 specular = (specularColor0 + additionalLightColor + (iblSpecular.color)) * fMetalVal;
 	vec3 color =  diffuse + specular;
 	vec3 ao = hbao();
-	//gl_FragColor = vec4(color, 1.0); 
-	//gl_FragColor *= inShadow(worldPos);
-	gl_FragColor = vec4(ao, 1.0);
+	gl_FragColor = vec4(color, 1.0); 
+	gl_FragColor *= inShadow(worldPos);
+	gl_FragColor *= vec4(ao, 1.0);
 }
