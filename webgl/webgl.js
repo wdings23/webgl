@@ -17,16 +17,16 @@ var gMRTFramebuffer;
 var gaMRTQuadBuffer = [];
 var gDepthTexture;
 var gMRTFinalQuadBuffer;
-var gLightViewFrameBuffer;
-var gLightViewTexture;
-var gLightViewQuadBuffer;
-var gLightViewCamera;
+var gLightViewFrameBuffers = new Array(3);
+var gLightViewTextures = new Array(3);
+var gLightViewQuadBuffers = new Array(3);
+var gLightViewCameras = new Array(3);
+var gFrustumClipZ = new Array(3);
 
 var gDVA;
 var gPistol = null;
 var gSky;
 
-var gLightViewFrameBuffer = null;
 var gGround = {vbo: null, textures: null};
 
 var MRTEnum =
@@ -287,7 +287,9 @@ function initGL()
         gl.getExtension("OES_standard_derivatives");
 
         [gMRTFramebuffer, gaMRTTextures, gDepthTexture] = createFBTextures();
-        [gLightViewFrameBuffer, gLightViewTexture] = createLightViewFrameBuffer();
+        [gLightViewFrameBuffers[0], gLightViewTextures[0]] = createLightViewFrameBuffer();
+        [gLightViewFrameBuffers[1], gLightViewTextures[1]] = createLightViewFrameBuffer();
+        [gLightViewFrameBuffers[2], gLightViewTextures[2]] = createLightViewFrameBuffer();
 
         // debug texture quads
         gaMRTQuadBuffer.push(createQuad(0.4, -1.4, -0.5));
@@ -297,7 +299,9 @@ function initGL()
         gaMRTQuadBuffer.push(createQuad(0.4, 0.6, -0.5));
         gaMRTQuadBuffer.push(createQuad(0.4, 1.1, -0.5));
         
-        gLightViewQuadBuffer = createQuad(0.4, -1.4, 0.5);
+        gLightViewQuadBuffers[0] = createQuad(0.4, -1.4, 0.5);
+        gLightViewQuadBuffers[1] = createQuad(0.4, -0.9, 0.5);
+        gLightViewQuadBuffers[2] = createQuad(0.4, -0.4, 0.5);
         gMRTFinalQuadBuffer = createQuad(2.0, 0.0, 0.0);
 
         loadData();
@@ -456,7 +460,9 @@ function initGL()
         */
         gCamera = new Camera(new Vector3(0.0, 1.0, -2.0), new Vector3(0.0, 0.0, 100.0));
         //gCamera = new Camera(new Vector3(5.0, 10.0, 5.0), new Vector3(0.0, 0.0, 0.0));
-        gLightViewCamera = new Camera(new Vector3(-6.0, 10.0, 4.0), new Vector3(0.0, 0.0, 0.0));
+        gLightViewCameras[0] = new Camera(new Vector3(-6.0, 10.0, 4.0), new Vector3(0.0, 0.0, 0.0));
+        gLightViewCameras[1] = new Camera(new Vector3(-6.0, 10.0, 4.0), new Vector3(0.0, 0.0, 0.0));
+        gLightViewCameras[2] = new Camera(new Vector3(-6.0, 10.0, 4.0), new Vector3(0.0, 0.0, 0.0));
 
         window.setInterval(handleKeyboard, 16);
         window.addEventListener('keydown', onKeyDown);
@@ -595,7 +601,6 @@ function tick()
     drawFromLight();
 
     drawMRT('mrt');
-    //draw();
     drawMRTFinal();
 
     updateUI();
@@ -605,166 +610,97 @@ function tick()
 **
 */
 var gfMult = 1.0;
+var gFar = 12.0;
+var gNear = 2.0;
+var gLightDir = new Vector3(1.0, -1.0, -1.0);
 function update()
 {
-    var up = new Vector3(0.0, 1.0, 0.0);
-    var lookAt = gCamera.lookAt.subtract(gCamera.position);
-    lookAt.normalize();
-    if (Math.abs(lookAt.y) >= 0.9999)
-    {
-        up.x = 0.0; up.y = 0.0; up.z = 1.0;
-    }
+    gLightDir.normalize();
 
-    gCamera.update(up, 100.0, 0.5, 500.0, 500.0);
+    var canvas = document.getElementById('glcanvas');
 
-    gLightViewCamera.position.z += (0.01 * gfMult);
-    if (Math.abs(gLightViewCamera.position.z) > 15.0)
+    gCamera.computeViewMatrix();
+    gCamera.updatePerspectiveProjection(100.0, 0.5, canvas.clientWidth, canvas.clientHeight);
+
+    /*gLightViewCameras[0].position.z += (0.01 * gfMult);
+    if (Math.abs(gLightViewCameras[0].position.z) > 15.0)
     {
         gfMult *= -1.0;
+    }*/
+
+    for (var cameraIndex = 0; cameraIndex < gLightViewCameras.length; cameraIndex++)
+    {
+        var worldSpaceFrustumInfo = getFrustumBounding(gCamera, cameraIndex);
+        var worldSpaceFrustumCoords = worldSpaceFrustumInfo[0];
+
+        gFrustumClipZ[cameraIndex] = [worldSpaceFrustumInfo[1], worldSpaceFrustumInfo[2]];
+
+        var bounds = getBounds(worldSpaceFrustumCoords);
+        var center = new Vector3(
+            (bounds[1].x + bounds[0].x) * 0.5,
+            (bounds[1].y + bounds[0].y) * 0.5,
+            (bounds[1].z + bounds[0].z) * 0.5);
+
+        // frustum bounds for placing light view camera
+        var frustumBounds = new Vector3(
+            bounds[1].x - bounds[0].x,
+            bounds[1].y - bounds[0].y,
+            bounds[1].z - bounds[0].z);
+
+        var largestCoord = frustumBounds.x;
+        if(frustumBounds.y > frustumBounds.x && frustumBounds.y > frustumBounds.z)
+        {
+            largestCoord = frustumBounds.y;
+        }
+        else if(frustumBounds.z > frustumBounds.x && frustumBounds.z > frustumBounds.y)
+        {
+            largestCoord = frustumBounds.z;
+        }
+
+        largestCoord += 5.0;
+        var lightPos = new Vector3(
+            center.x - gLightDir.x * largestCoord,
+            center.y - gLightDir.y * largestCoord,
+            center.z - gLightDir.z * largestCoord);
+
+        // update view matrix with new position and look at
+        gLightViewCameras[cameraIndex].position = lightPos;
+        gLightViewCameras[cameraIndex].lookAt = center;
+        gLightViewCameras[cameraIndex].computeViewMatrix();
+
+        // transform to light space
+        var lightSpaceFrustumCoords = [];
+        for (var i = 0; i < worldSpaceFrustumCoords.length; i++)
+        {
+            lightSpaceFrustumCoords.push(gLightViewCameras[cameraIndex].viewMatrix.xform(worldSpaceFrustumCoords[i]));
+        }
+
+        var lightSpaceBounds = getBounds(lightSpaceFrustumCoords);
+        var diff = new Vector3(
+            lightSpaceBounds[1].x - lightSpaceBounds[0].x,
+            lightSpaceBounds[1].y - lightSpaceBounds[0].y,
+            lightSpaceBounds[1].z - lightSpaceBounds[0].z);
+
+        var center = new Vector3(
+            (lightSpaceBounds[1].x + lightSpaceBounds[0].x) / 2,
+            (lightSpaceBounds[1].y + lightSpaceBounds[0].y) / 2,
+            (lightSpaceBounds[1].z + lightSpaceBounds[0].z) / 2);
+
+        gLightViewCameras[cameraIndex].updateOrthographicProjection(
+            center.x - diff.x * 0.5,
+            center.x + diff.x * 0.5,
+            center.y - diff.y * 0.5,
+            center.y + diff.y * 0.5,
+            center.z - diff.z * 0.5,
+            center.z + diff.z * 0.5);
     }
 
-    var up = new Vector3(0.0, 1.0, 0.0);
-    var lookAt = gLightViewCamera.lookAt.subtract(gLightViewCamera.position);
-    lookAt.normalize();
-    if (Math.abs(lookAt.y) >= 0.9999) {
-        up.x = 0.0; up.y = 0.0; up.z = 1.0;
-    }
-
-    gLightViewCamera.update(up, 50.0, 1.0, 500.0, 500.0);
+    //console.log('gNear = ' + gNear + ' gFar = ' + gFar);
 }
 
 /*
 **
 */
-function draw()
-{
-    var shader = gShaderManager.getShaderProgram("pbr");
-    if (shader)
-    {
-        gl.useProgram(shader.program);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-        // uniforms
-        var colorUniform = gl.getUniformLocation(shader.program, "color");
-        var modelMatrixUniform = gl.getUniformLocation(shader.program, "modelMatrix");
-        var viewMatrixUniform = gl.getUniformLocation(shader.program, 'viewMatrix');
-        var projectionMatrixUniform = gl.getUniformLocation(shader.program, 'projMatrix');
-        var normalMatrixUniform = gl.getUniformLocation(shader.program, 'normMatrix');
-        var lightPosUniform = gl.getUniformLocation(shader.program, 'lightPos');
-
-        var sampleCoordUniform = gl.getUniformLocation(shader.program, 'afSamplePos');
-        var eyeCoordUniform = gl.getUniformLocation(shader.program, 'eyePos');
-
-        var samplePos = getSampleCoords(128);
-        gl.uniform2fv(sampleCoordUniform, new Float32Array(samplePos));
-        
-        gl.uniform3f(eyeCoordUniform, gCamera.position.x, gCamera.position.y, gCamera.position.z);
-
-        var lightPos = [-5.0, 20.0, 0.0, 1.0];
-        gl.uniform4fv(lightPosUniform, new Float32Array(lightPos));
-
-        // attribs (position and normal)
-        var vertexAttrib = gl.getAttribLocation(shader.program, "position");
-        gl.enableVertexAttribArray(vertexAttrib);
-
-        var normalAttrib = gl.getAttribLocation(shader.program, "normal");
-        gl.enableVertexAttribArray(normalAttrib);
-
-        var uvAttrib = gl.getAttribLocation(shader.program, "uv");
-        gl.enableVertexAttribArray(uvAttrib);
-
-        var tex0Uniform = gl.getUniformLocation(shader.program, 'environmentSampler');
-        var tex1Uniform = gl.getUniformLocation(shader.program, 'albedoSampler');
-        var tex2Uniform = gl.getUniformLocation(shader.program, 'metalnessSampler');
-        var tex3Uniform = gl.getUniformLocation(shader.program, 'roughnessSampler');
-        var tex4Uniform = gl.getUniformLocation(shader.program, 'normalSampler');
-
-        gl.uniform1i(tex0Uniform, 0);
-        gl.uniform1i(tex1Uniform, 1);
-        gl.uniform1i(tex2Uniform, 2);
-        gl.uniform1i(tex3Uniform, 3);
-        gl.uniform1i(tex4Uniform, 4);
-
-        var stride = 3 * Float32Array.BYTES_PER_ELEMENT;
-        if (viewMatrixUniform)
-        {
-            gl.uniformMatrix4fv(viewMatrixUniform, false, new Float32Array(gCamera.viewMatrix.entries));
-        }
-
-        if (projectionMatrixUniform)
-        {
-            gl.uniformMatrix4fv(projectionMatrixUniform, false, new Float32Array(gCamera.projectionMatrix.entries));
-        }
-
-        if (normalMatrixUniform)
-        {
-            var orthonormalViewMatrix = new Matrix44();
-            orthonormalViewMatrix.copy(gCamera.viewMatrix);
-            orthonormalViewMatrix.entries[12] = orthonormalViewMatrix.entries[13] = orthonormalViewMatrix.entries[14] = 0.0;
-
-            var totalNormMatrix = matRotY.multiply(orthonormalViewMatrix);
-            gl.uniformMatrix4fv(normalMatrixUniform, false, new Float32Array(totalNormMatrix.entries));
-        }
-
-        //// model
-        //for (var i = 0; i < gGun.models.length; i++)
-        //{
-        //    var model = gGun.models[i];
-        //    gl.bindBuffer(gl.ARRAY_BUFFER, model.vbo)
-        //    gl.vertexAttribPointer(vertexAttrib, 3, gl.FLOAT, false, 32, 0);
-        //    gl.vertexAttribPointer(normalAttrib, 3, gl.FLOAT, false, 32, stride);
-        //    gl.vertexAttribPointer(uvAttrib, 2, gl.FLOAT, false, 32, stride + stride);
-        //    gl.drawArrays(gl.TRIANGLES, 0, model.numFaces * 3);
-        //}
-
-        // character
-        var identity = new Matrix44();
-        if (modelMatrixUniform)
-        {
-            gl.uniformMatrix4fv(modelMatrixUniform, false, new Float32Array(identity.entries));
-        }
-
-        if (normalMatrixUniform)
-        {
-            gl.uniformMatrix4fv(normalMatrixUniform, false, new Float32Array(identity.entries));
-        }
-
-        // environment texture
-        gl.bindTexture(gl.TEXTURE_CUBE_MAP, gEnvMap);
-        gl.activeTexture(gl.TEXTURE0);
-
-        var allModels = [gDVA];
-        var allModelMatrices = [];
-        for (var i = 0; i < allModels.length; i++) {
-            var matRotY = new Matrix44();
-            matRotY.rotateY(3.14159 * 1.87);
-            var matRotX = new Matrix44();
-            matRotX.rotateX(0.15);
-
-            var totalRot = matRotX.multiply(matRotY);
-            var matTrans = new Matrix44();
-            var posX = ((i - allModelMatrices.length / 2) + i);
-
-            matTrans.translate(posX, 0.0, 0.0);
-            var matModel = matTrans.multiply(totalRot);
-
-            allModelMatrices.push(matModel);
-        }
-
-        drawCharacters(allModels, allModelMatrices, modelMatrixUniform, vertexAttrib, normalAttrib, uvAttrib, true, 1);
-
-        gl.disable(gl.DEPTH_TEST);
-        drawCrossHair(gCrossHairInfo[0], gCrossHairInfo[1]);
-        for (var i = 0; i < gaMRTQuadBuffer.length; i++) {
-            drawQuad(gaMRTQuadBuffer[i], gaMRTTextures[i]);
-        }
-
-        drawQuad(gLightViewQuadBuffer, gLightViewTexture);
-
-        gl.enable(gl.DEPTH_TEST);
-    }
-}
-
 function drawCharacters(
     characters,
     modelMatrices,
@@ -1866,7 +1802,9 @@ function drawScene(shaderName, newFrameBuffer, camera)
 */
 function drawFromLight()
 {
-    drawScene('shadowmap', gLightViewFrameBuffer, gLightViewCamera);
+    drawScene('shadowmap', gLightViewFrameBuffers[0], gLightViewCameras[0]);
+    drawScene('shadowmap', gLightViewFrameBuffers[1], gLightViewCameras[1]);
+    drawScene('shadowmap', gLightViewFrameBuffers[2], gLightViewCameras[2]);
 }
 
 /*
@@ -1888,10 +1826,15 @@ function drawMRTFinal(quadBuffer) {
         gl.useProgram(shader.program);
 
         // light view camera matrix
-        var lightViewMatrixUniform = gl.getUniformLocation(shader.program, 'lightViewMatrix');
-        var lightProjectionMatrixUniform = gl.getUniformLocation(shader.program, 'lightProjectionMatrix');
-        gl.uniformMatrix4fv(lightViewMatrixUniform, false, new Float32Array(gLightViewCamera.viewMatrix.entries));
-        gl.uniformMatrix4fv(lightProjectionMatrixUniform, false, new Float32Array(gLightViewCamera.projectionMatrix.entries));
+        for (var i = 0; i < gLightViewCameras.length; i++) {
+            var viewMatrixName = 'lightViewMatrix' + i;
+            var projMatrixName = 'lightProjectionMatrix' + i;
+
+            var lightViewMatrixUniform = gl.getUniformLocation(shader.program, viewMatrixName);
+            var lightProjectionMatrixUniform = gl.getUniformLocation(shader.program, projMatrixName);
+            gl.uniformMatrix4fv(lightViewMatrixUniform, false, new Float32Array(gLightViewCameras[i].viewMatrix.entries));
+            gl.uniformMatrix4fv(lightProjectionMatrixUniform, false, new Float32Array(gLightViewCameras[i].projectionMatrix.entries));
+        }
 
         // sampling and eye coordinates uniforms
         var sampleCoordUniform = gl.getUniformLocation(shader.program, 'afSamplePos');
@@ -1908,7 +1851,7 @@ function drawMRTFinal(quadBuffer) {
 
         var lightPositionUniform = gl.getUniformLocation(shader.program, 'lightPosition');
         if (lightPositionUniform) {
-            gl.uniform3f(lightPositionUniform, gLightViewCamera.position.x, gLightViewCamera.position.y, gLightViewCamera.position.z);
+            gl.uniform3f(lightPositionUniform, gLightViewCameras[0].position.x, gLightViewCameras[0].position.y, gLightViewCameras[0].position.z);
         }
 
         // attribs (position and uv)
@@ -1936,8 +1879,30 @@ function drawMRTFinal(quadBuffer) {
             gl.uniform1i(uniforms[i], i);
         }
 
-        var lightViewUniform = gl.getUniformLocation(shader.program, 'lightViewDepthMap');
-        gl.uniform1i(lightViewUniform, samplerNames.length);
+        var lightViewUniform0 = gl.getUniformLocation(shader.program, 'lightViewDepthMap0');
+        gl.uniform1i(lightViewUniform0, samplerNames.length);
+
+        var lightViewUniform1 = gl.getUniformLocation(shader.program, 'lightViewDepthMap1');
+        if (lightViewUniform1) {
+            gl.uniform1i(lightViewUniform1, samplerNames.length + 1);
+        }
+
+        var lightViewUniform2 = gl.getUniformLocation(shader.program, 'lightViewDepthMap2');
+        if (lightViewUniform2) {
+            gl.uniform1i(lightViewUniform2, samplerNames.length + 2);
+        }
+
+        var clipSpaceUniform0 = gl.getUniformLocation(shader.program, 'uClipSpaceZ0');
+        if (clipSpaceUniform0)
+        {
+            gl.uniform1f(clipSpaceUniform0, gFrustumClipZ[0][1]);
+        }
+
+        var clipSpaceUniform1 = gl.getUniformLocation(shader.program, 'uClipSpaceZ1');
+        if (clipSpaceUniform1) {
+            gl.uniform1f(clipSpaceUniform1, gFrustumClipZ[1][1]);
+        }
+
 
         //var MRTEnum =
         //{
@@ -1957,8 +1922,10 @@ function drawMRTFinal(quadBuffer) {
             gl.bindTexture(gl.TEXTURE_2D, gaMRTTextures[i]);
         }
 
-        gl.activeTexture(gl.TEXTURE0 + samplerNames.length);
-        gl.bindTexture(gl.TEXTURE_2D, gLightViewTexture);
+        for (var i = 0; i < gLightViewTextures.length; i++) {
+            gl.activeTexture(gl.TEXTURE0 + samplerNames.length + i);
+            gl.bindTexture(gl.TEXTURE_2D, gLightViewTextures[i]);
+        }
 
         var stride = 4 * Float32Array.BYTES_PER_ELEMENT;
         var vertexSize = (4 + 2) * Float32Array.BYTES_PER_ELEMENT;
@@ -1978,7 +1945,9 @@ function drawMRTFinal(quadBuffer) {
         drawQuad(gaMRTQuadBuffer[i], gaMRTTextures[i]);
     }
 
-    drawQuad(gLightViewQuadBuffer, gLightViewTexture);
+    for (var i = 0; i < gLightViewQuadBuffers.length; i++) {
+        drawQuad(gLightViewQuadBuffers[i], gLightViewTextures[i]);
+    }
     gl.enable(gl.DEPTH_TEST);
 }
 
@@ -1997,4 +1966,117 @@ function loadData() {
     gSky.floatArray = new Float32Array(floatArray);
     gSky.updateVBO();
     gSky.numFaces = (gSky.floatArray.length / 8) / 3;
+}
+
+/*
+**
+*/
+function getFrustumBounding(camera, cascadeIndex)
+{
+    var cascadeDistance = [1.0, 5.0, 20.0, 50.0];
+
+    var near = cascadeDistance[cascadeIndex];
+    var far = cascadeDistance[cascadeIndex + 1];
+
+    var halfAngle = camera.fovAngle / 2;
+
+    var nearLeftX = -near * Math.tan(halfAngle);
+    var nearRightX = near * Math.tan(halfAngle);
+    var nearZ = near;
+
+    var farLeftX = -far * Math.tan(halfAngle);
+    var farRightX = far * Math.tan(halfAngle);
+    var farZ = far;
+
+    var nearTopLeft = new Vector3(nearLeftX, nearRightX, nearZ);
+    var nearTopRight = new Vector3(nearRightX, nearRightX, nearZ);
+
+    var nearBottomLeft = new Vector3(nearLeftX, -nearRightX, nearZ);
+    var nearBottomRight = new Vector3(nearRightX, -nearRightX, nearZ);
+
+    var farTopLeft = new Vector3(farLeftX, farRightX, farZ);
+    var farTopRight = new Vector3(farRightX, farRightX, farZ);
+
+    var farBottomLeft = new Vector3(farLeftX, -farRightX, farZ);
+    var farBottomRight = new Vector3(farRightX, -farRightX, farZ);
+
+    var xforms = new Array(8);
+    xforms[0] = gCamera.projectionMatrix.xform(nearTopLeft);
+    xforms[1] = gCamera.projectionMatrix.xform(nearTopRight);
+    xforms[2] = gCamera.projectionMatrix.xform(nearBottomLeft);
+    xforms[3] = gCamera.projectionMatrix.xform(nearBottomRight);
+    xforms[4] = gCamera.projectionMatrix.xform(farTopLeft);
+    xforms[5] = gCamera.projectionMatrix.xform(farTopRight);
+    xforms[6] = gCamera.projectionMatrix.xform(farBottomLeft);
+    xforms[7] = gCamera.projectionMatrix.xform(farBottomRight);
+    
+    var smallestZ = xforms[0].z / xforms[0].w;
+    var largestZ = smallestZ;
+    for (var i = 0; i < xforms.length; i++)
+    {
+        var clipSpaceZ = xforms[i].z / xforms[i].w;
+        if(clipSpaceZ < smallestZ)
+        {
+            smallestZ = clipSpaceZ;
+        }
+
+        if(clipSpaceZ > largestZ)
+        {
+            largestZ = clipSpaceZ;
+        }
+    }
+
+    var coords = [];
+
+    // todo: invert view matrix
+    var inverseViewMatrix = camera.viewMatrix.invert();
+
+    var check = camera.viewMatrix.multiply(inverseViewMatrix);
+
+    coords.push(inverseViewMatrix.xform(nearTopLeft));
+    coords.push(inverseViewMatrix.xform(nearTopRight));
+    coords.push(inverseViewMatrix.xform(nearBottomLeft));
+    coords.push(inverseViewMatrix.xform(nearBottomRight));
+
+    coords.push(inverseViewMatrix.xform(farTopLeft));
+    coords.push(inverseViewMatrix.xform(farTopRight));
+    coords.push(inverseViewMatrix.xform(farBottomLeft));
+    coords.push(inverseViewMatrix.xform(farBottomRight));
+    
+    return [coords, smallestZ, largestZ];
+}
+
+/*
+**
+*/
+function getBounds(coords) {
+    var smallest = new Vector3(9999.0, 9999.0, 9999.0);
+    var largest = new Vector3(-9999.0, -9999.0, -9999.0);
+    for (var i = 0; i < coords.length; i++) {
+        if (smallest.x > coords[i].x) {
+            smallest.x = coords[i].x;
+        }
+
+        if (largest.x < coords[i].x) {
+            largest.x = coords[i].x;
+        }
+
+        if (smallest.y > coords[i].y) {
+            smallest.y = coords[i].y;
+        }
+
+        if (largest.y < coords[i].y) {
+            largest.y = coords[i].y;
+        }
+
+        if (smallest.z > coords[i].z) {
+            smallest.z = coords[i].z;
+        }
+
+        if (largest.z < coords[i].z) {
+            largest.z = coords[i].z;
+        }
+    }
+
+    return [smallest, largest];
 }

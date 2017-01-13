@@ -9,17 +9,28 @@ uniform sampler2D		worldSpaceMap;
 uniform sampler2D		albedoMap;
 uniform sampler2D		normalSampler;
 uniform sampler2D		metalRoughnessMap;
-uniform sampler2D		lightViewDepthMap;
+uniform sampler2D		lightViewDepthMap0;
+uniform sampler2D		lightViewDepthMap1;
+uniform sampler2D		lightViewDepthMap2;
 
 uniform vec2			afSamplePos[NUM_SAMPLES];
 uniform vec3			eyePos;
 uniform vec3			lookDir;
 uniform vec3			lightPosition;
 
-uniform mat4			lightViewMatrix;
-uniform mat4			lightProjectionMatrix;
+uniform mat4			lightViewMatrix0;
+uniform mat4			lightProjectionMatrix0;
+
+uniform mat4			lightViewMatrix1;
+uniform mat4			lightProjectionMatrix1;
+
+uniform mat4			lightViewMatrix2;
+uniform mat4			lightProjectionMatrix2;
 
 varying vec2			vUV;
+
+uniform float			uClipSpaceZ0;
+uniform float			uClipSpaceZ1;
 
 float fImageDimension = 128.0;
 float fOneOverPI = 1.0 / 3.14159;
@@ -284,11 +295,27 @@ float chebyshevUpperBound(vec2 moments, float fDistance)
 /*
 **
 */
-vec4 inShadow(vec4 worldPos)
+vec4 inShadow(vec4 worldPos, vec4 clipSpace)
 {
 	const float fSampleSpread = 0.001;
 	const float fSampleRate = 0.002;
 	const float fBias = 0.0;
+
+	mat4 lightViewMatrix = lightViewMatrix0;
+	mat4 lightProjectionMatrix = lightProjectionMatrix0;
+	
+	float fClipSpaceZ = clipSpace.z;// * 0.5 + 0.5;
+
+	if(fClipSpaceZ >= uClipSpaceZ0 && fClipSpaceZ < uClipSpaceZ1)
+	{
+		lightViewMatrix = lightViewMatrix1;
+		lightProjectionMatrix = lightProjectionMatrix1;
+	}
+	else if(fClipSpaceZ >= uClipSpaceZ1)
+	{
+		lightViewMatrix = lightViewMatrix2;
+		lightProjectionMatrix = lightProjectionMatrix2;
+	}
 
 	vec4 lightSpacePos = lightProjectionMatrix * lightViewMatrix * worldPos;
 
@@ -309,7 +336,19 @@ vec4 inShadow(vec4 worldPos)
 			float fV = fOffsetY * 0.5 + 0.5;
 
 			vec2 lightSpaceUV = vec2(fU, fV);
-			vec4 depth = texture2D(lightViewDepthMap, lightSpaceUV);
+			vec4 depth = vec4(0.0, 0.0, 0.0, 1.0);
+			if(fClipSpaceZ < uClipSpaceZ0)
+			{
+				depth = texture2D(lightViewDepthMap0, lightSpaceUV);
+			}
+			else if(fClipSpaceZ >= uClipSpaceZ0 && fClipSpaceZ < uClipSpaceZ1)
+			{
+				depth = texture2D(lightViewDepthMap1, lightSpaceUV);
+			}
+			else if(fClipSpaceZ >= uClipSpaceZ1)
+			{
+				depth = texture2D(lightViewDepthMap2, lightSpaceUV);
+			}
 			float fCurrDepth = (lightSpacePos.z / lightSpacePos.w) * 0.5 + 0.5;
 			
 			vec2 moments = vec2(depth.x, depth.y);
@@ -541,6 +580,20 @@ void main()
 	vec3 color =  diffuse + specular;
 	vec3 ao = hbao();
 	gl_FragColor = vec4(color, 1.0); 
-	gl_FragColor *= inShadow(worldPos);
+	gl_FragColor *= inShadow(worldPos, clipSpace);
 	gl_FragColor *= vec4(ao, 1.0);
+
+	/*float fClipSpaceZ = clipSpace.z;
+	if(fClipSpaceZ < uClipSpaceZ0)
+	{
+		gl_FragColor *= vec4(1.0, 0.0, 0.0, 1.0);
+	}
+	else if(fClipSpaceZ >= uClipSpaceZ0 && fClipSpaceZ < uClipSpaceZ1)
+	{
+		gl_FragColor *= vec4(0.0, 1.0, 0.0, 1.0);
+	}
+	else
+	{
+		gl_FragColor *= vec4(0.0, 0.0, 1.0, 1.0);
+	}*/
 }

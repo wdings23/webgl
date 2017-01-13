@@ -17,10 +17,14 @@ varying vec4 vWorldPos;
 */
 void main()
 {
+	float fClipX = vClipSpacePos.x / vClipSpacePos.w;
+	float fClipY = vClipSpacePos.y / vClipSpacePos.w;
+	float fClipZ = (vClipSpacePos.z / vClipSpacePos.w);
+
 	gl_FragData[0] = vNorm;
-	gl_FragData[1].x = vClipSpacePos.x / vClipSpacePos.w;
-	gl_FragData[1].y = vClipSpacePos.y / vClipSpacePos.w;
-	gl_FragData[1].z = vClipSpacePos.z / vClipSpacePos.w;
+	gl_FragData[1].x = fClipX;
+	gl_FragData[1].y = fClipY;
+	gl_FragData[1].z = fClipZ;
 	gl_FragData[1].w = 1.0;
 
 	vec2 newUV = vUV.xy;
@@ -34,8 +38,5 @@ void main()
 	gl_FragData[5].z = 0.0;
 	gl_FragData[5].w = 1.0;
 	
-	
-
-
 	//gl_FragColor = vec4(vNorm.xyz, 1.0);
 }

@@ -207,3 +207,133 @@ Matrix44.prototype.xform = function(orig)
 
     return ret;
 }
+
+Matrix44.prototype.invert = function()
+{
+    var inv = new Array(16);
+
+    inv[0] = this.entries[5]  * this.entries[10] * this.entries[15] - 
+             this.entries[5]  * this.entries[11] * this.entries[14] - 
+             this.entries[9]  * this.entries[6]  * this.entries[15] + 
+             this.entries[9]  * this.entries[7]  * this.entries[14] +
+             this.entries[13] * this.entries[6]  * this.entries[11] - 
+             this.entries[13] * this.entries[7]  * this.entries[10];
+
+    inv[4] = -this.entries[4]  * this.entries[10] * this.entries[15] + 
+              this.entries[4]  * this.entries[11] * this.entries[14] + 
+              this.entries[8]  * this.entries[6]  * this.entries[15] - 
+              this.entries[8]  * this.entries[7]  * this.entries[14] - 
+              this.entries[12] * this.entries[6]  * this.entries[11] + 
+              this.entries[12] * this.entries[7]  * this.entries[10];
+
+    inv[8] = this.entries[4]  * this.entries[9] * this.entries[15] - 
+             this.entries[4]  * this.entries[11] * this.entries[13] - 
+             this.entries[8]  * this.entries[5] * this.entries[15] + 
+             this.entries[8]  * this.entries[7] * this.entries[13] + 
+             this.entries[12] * this.entries[5] * this.entries[11] - 
+             this.entries[12] * this.entries[7] * this.entries[9];
+
+    inv[12] = -this.entries[4]  * this.entries[9] * this.entries[14] + 
+               this.entries[4]  * this.entries[10] * this.entries[13] +
+               this.entries[8]  * this.entries[5] * this.entries[14] - 
+               this.entries[8]  * this.entries[6] * this.entries[13] - 
+               this.entries[12] * this.entries[5] * this.entries[10] + 
+               this.entries[12] * this.entries[6] * this.entries[9];
+
+    inv[1] = -this.entries[1]  * this.entries[10] * this.entries[15] + 
+              this.entries[1]  * this.entries[11] * this.entries[14] + 
+              this.entries[9]  * this.entries[2] * this.entries[15] - 
+              this.entries[9]  * this.entries[3] * this.entries[14] - 
+              this.entries[13] * this.entries[2] * this.entries[11] + 
+              this.entries[13] * this.entries[3] * this.entries[10];
+
+    inv[5] = this.entries[0]  * this.entries[10] * this.entries[15] - 
+             this.entries[0]  * this.entries[11] * this.entries[14] - 
+             this.entries[8]  * this.entries[2] * this.entries[15] + 
+             this.entries[8]  * this.entries[3] * this.entries[14] + 
+             this.entries[12] * this.entries[2] * this.entries[11] - 
+             this.entries[12] * this.entries[3] * this.entries[10];
+
+    inv[9] = -this.entries[0]  * this.entries[9] * this.entries[15] + 
+              this.entries[0]  * this.entries[11] * this.entries[13] + 
+              this.entries[8]  * this.entries[1] * this.entries[15] - 
+              this.entries[8]  * this.entries[3] * this.entries[13] - 
+              this.entries[12] * this.entries[1] * this.entries[11] + 
+              this.entries[12] * this.entries[3] * this.entries[9];
+
+    inv[13] = this.entries[0]  * this.entries[9] * this.entries[14] - 
+              this.entries[0]  * this.entries[10] * this.entries[13] - 
+              this.entries[8]  * this.entries[1] * this.entries[14] + 
+              this.entries[8]  * this.entries[2] * this.entries[13] + 
+              this.entries[12] * this.entries[1] * this.entries[10] - 
+              this.entries[12] * this.entries[2] * this.entries[9];
+
+    inv[2] = this.entries[1]  * this.entries[6] * this.entries[15] - 
+             this.entries[1]  * this.entries[7] * this.entries[14] - 
+             this.entries[5]  * this.entries[2] * this.entries[15] + 
+             this.entries[5]  * this.entries[3] * this.entries[14] + 
+             this.entries[13] * this.entries[2] * this.entries[7] - 
+             this.entries[13] * this.entries[3] * this.entries[6];
+
+    inv[6] = -this.entries[0]  * this.entries[6] * this.entries[15] + 
+              this.entries[0]  * this.entries[7] * this.entries[14] + 
+              this.entries[4]  * this.entries[2] * this.entries[15] - 
+              this.entries[4]  * this.entries[3] * this.entries[14] - 
+              this.entries[12] * this.entries[2] * this.entries[7] + 
+              this.entries[12] * this.entries[3] * this.entries[6];
+
+    inv[10] = this.entries[0]  * this.entries[5] * this.entries[15] - 
+              this.entries[0]  * this.entries[7] * this.entries[13] - 
+              this.entries[4]  * this.entries[1] * this.entries[15] + 
+              this.entries[4]  * this.entries[3] * this.entries[13] + 
+              this.entries[12] * this.entries[1] * this.entries[7] - 
+              this.entries[12] * this.entries[3] * this.entries[5];
+
+    inv[14] = -this.entries[0]  * this.entries[5] * this.entries[14] + 
+               this.entries[0]  * this.entries[6] * this.entries[13] + 
+               this.entries[4]  * this.entries[1] * this.entries[14] - 
+               this.entries[4]  * this.entries[2] * this.entries[13] - 
+               this.entries[12] * this.entries[1] * this.entries[6] + 
+               this.entries[12] * this.entries[2] * this.entries[5];
+
+    inv[3] = -this.entries[1] * this.entries[6] * this.entries[11] + 
+              this.entries[1] * this.entries[7] * this.entries[10] + 
+              this.entries[5] * this.entries[2] * this.entries[11] - 
+              this.entries[5] * this.entries[3] * this.entries[10] - 
+              this.entries[9] * this.entries[2] * this.entries[7] + 
+              this.entries[9] * this.entries[3] * this.entries[6];
+
+    inv[7] = this.entries[0] * this.entries[6] * this.entries[11] - 
+             this.entries[0] * this.entries[7] * this.entries[10] - 
+             this.entries[4] * this.entries[2] * this.entries[11] + 
+             this.entries[4] * this.entries[3] * this.entries[10] + 
+             this.entries[8] * this.entries[2] * this.entries[7] - 
+             this.entries[8] * this.entries[3] * this.entries[6];
+
+    inv[11] = -this.entries[0] * this.entries[5] * this.entries[11] + 
+               this.entries[0] * this.entries[7] * this.entries[9] + 
+               this.entries[4] * this.entries[1] * this.entries[11] - 
+               this.entries[4] * this.entries[3] * this.entries[9] - 
+               this.entries[8] * this.entries[1] * this.entries[7] + 
+               this.entries[8] * this.entries[3] * this.entries[5];
+
+    inv[15] = this.entries[0] * this.entries[5] * this.entries[10] - 
+              this.entries[0] * this.entries[6] * this.entries[9] - 
+              this.entries[4] * this.entries[1] * this.entries[10] + 
+              this.entries[4] * this.entries[2] * this.entries[9] + 
+              this.entries[8] * this.entries[1] * this.entries[6] - 
+              this.entries[8] * this.entries[2] * this.entries[5];
+
+    var det = this.entries[0] * inv[0] + this.entries[1] * inv[4] + this.entries[2] * inv[8] + this.entries[3] * inv[12];
+
+    if (det == 0)
+        return false;
+
+    det = 1.0 / det;
+
+    var ret = new Matrix44();
+    for (var i = 0; i < 16; i++)
+        ret.entries[i] = inv[i] * det;
+
+    return ret;
+}
