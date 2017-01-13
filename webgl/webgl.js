@@ -686,13 +686,24 @@ function update()
             (lightSpaceBounds[1].y + lightSpaceBounds[0].y) / 2,
             (lightSpaceBounds[1].z + lightSpaceBounds[0].z) / 2);
 
+        var largestBound = diff.x;
+        if (diff.y > diff.x && diff.y > diff.z)
+        {
+            largestBound = diff.y;
+        }
+        else if (diff.z > diff.x && diff.z > diff.y)
+        {
+            largestBound = diff.z;
+        }
+
+        largestBound *= 1.25;
         gLightViewCameras[cameraIndex].updateOrthographicProjection(
-            center.x - diff.x * 0.5,
-            center.x + diff.x * 0.5,
-            center.y - diff.y * 0.5,
-            center.y + diff.y * 0.5,
-            center.z - diff.z * 0.5,
-            center.z + diff.z * 0.5);
+            center.x - largestBound * 0.5,
+            center.x + largestBound * 0.5,
+            center.y - largestBound * 0.5,
+            center.y + largestBound * 0.5,
+            center.z - largestBound * 0.5,
+            center.z + largestBound * 0.5);
     }
 
     //console.log('gNear = ' + gNear + ' gFar = ' + gFar);
@@ -2001,14 +2012,14 @@ function getFrustumBounding(camera, cascadeIndex)
     var farBottomRight = new Vector3(farRightX, -farRightX, farZ);
 
     var xforms = new Array(8);
-    xforms[0] = gCamera.projectionMatrix.xform(nearTopLeft);
-    xforms[1] = gCamera.projectionMatrix.xform(nearTopRight);
-    xforms[2] = gCamera.projectionMatrix.xform(nearBottomLeft);
-    xforms[3] = gCamera.projectionMatrix.xform(nearBottomRight);
-    xforms[4] = gCamera.projectionMatrix.xform(farTopLeft);
-    xforms[5] = gCamera.projectionMatrix.xform(farTopRight);
-    xforms[6] = gCamera.projectionMatrix.xform(farBottomLeft);
-    xforms[7] = gCamera.projectionMatrix.xform(farBottomRight);
+    xforms[0] = camera.projectionMatrix.xform(nearTopLeft);
+    xforms[1] = camera.projectionMatrix.xform(nearTopRight);
+    xforms[2] = camera.projectionMatrix.xform(nearBottomLeft);
+    xforms[3] = camera.projectionMatrix.xform(nearBottomRight);
+    xforms[4] = camera.projectionMatrix.xform(farTopLeft);
+    xforms[5] = camera.projectionMatrix.xform(farTopRight);
+    xforms[6] = camera.projectionMatrix.xform(farBottomLeft);
+    xforms[7] = camera.projectionMatrix.xform(farBottomRight);
     
     var smallestZ = xforms[0].z / xforms[0].w;
     var largestZ = smallestZ;
@@ -2028,9 +2039,7 @@ function getFrustumBounding(camera, cascadeIndex)
 
     var coords = [];
 
-    // todo: invert view matrix
     var inverseViewMatrix = camera.viewMatrix.invert();
-
     var check = camera.viewMatrix.multiply(inverseViewMatrix);
 
     coords.push(inverseViewMatrix.xform(nearTopLeft));
