@@ -375,6 +375,9 @@ vec4 inShadow(vec4 worldPos, vec4 clipSpace)
 	}
 
 	totalColor.xyz /= fTotalSamples;
+	totalColor.x = max(totalColor.x, 0.3);
+	totalColor.y = max(totalColor.y, 0.3);
+	totalColor.z = max(totalColor.z, 0.3);
 
 	return totalColor;
 }

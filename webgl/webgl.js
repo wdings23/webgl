@@ -612,9 +612,19 @@ function tick()
 var gfMult = 1.0;
 var gFar = 12.0;
 var gNear = 2.0;
-var gLightDir = new Vector3(1.0, -1.0, -1.0);
+var gLightDir = new Vector3(1.0, -3.0, -1.0);
+var gInc = 1.0;
+var gValZ = 0.0;
 function update()
 {
+    if (Math.abs(gValZ) >= 1.0) {
+        gInc *= -1.0;
+    }
+
+    gLightDir.x += 0.001 * -gInc;
+    gLightDir.z += 0.001 * gInc;
+    gValZ += 0.001 * gInc;
+
     gLightDir.normalize();
 
     var canvas = document.getElementById('glcanvas');
