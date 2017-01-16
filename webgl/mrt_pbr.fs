@@ -324,7 +324,8 @@ vec4 inShadow(vec4 worldPos, vec4 clipSpace)
 	
 	vec4 totalColor = vec4(0.0, 0.0, 0.0, 1.0);
 	float fTotalSamples = 0.0;
-	
+	float fNumValidUV = 0.0;
+
 	for(float i = -fSampleRate; i <= fSampleRate; i += fSampleSpread)
 	{
 		for(float j = -fSampleRate; j <= fSampleRate; j += fSampleSpread)
@@ -334,6 +335,11 @@ vec4 inShadow(vec4 worldPos, vec4 clipSpace)
 
 			float fU = fOffsetX * 0.5 + 0.5;
 			float fV = fOffsetY * 0.5 + 0.5;
+
+			if(fU < 0.0 || fU > 1.0 || fV < 0.0 || fV > 1.0)
+			{
+				continue;
+			}
 
 			vec2 lightSpaceUV = vec2(fU, fV);
 			vec4 depth = vec4(0.0, 0.0, 0.0, 1.0);
@@ -374,10 +380,17 @@ vec4 inShadow(vec4 worldPos, vec4 clipSpace)
 		}
 	}
 
-	totalColor.xyz /= fTotalSamples;
-	totalColor.x = max(totalColor.x, 0.3);
-	totalColor.y = max(totalColor.y, 0.3);
-	totalColor.z = max(totalColor.z, 0.3);
+	if(fTotalSamples <= 0.0)
+	{
+		totalColor.x = totalColor.y = totalColor.z = 1.0;
+	}
+	else
+	{
+		totalColor.xyz /= fTotalSamples;
+		totalColor.x = max(totalColor.x, 0.3);
+		totalColor.y = max(totalColor.y, 0.3);
+		totalColor.z = max(totalColor.z, 0.3);
+	}
 
 	return totalColor;
 }

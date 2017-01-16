@@ -640,7 +640,8 @@ function update()
 
     for (var cameraIndex = 0; cameraIndex < gLightViewCameras.length; cameraIndex++)
     {
-        var worldSpaceFrustumInfo = getFrustumBounding(gCamera, cameraIndex);
+        // frustum's world position and bound
+        var worldSpaceFrustumInfo = getFrustumBounding(gCamera, cameraIndex, canvas.clientWidth, canvas.clientHeight);
         var worldSpaceFrustumCoords = worldSpaceFrustumInfo[0];
 
         gFrustumClipZ[cameraIndex] = [worldSpaceFrustumInfo[1], worldSpaceFrustumInfo[2]];
@@ -667,11 +668,11 @@ function update()
             largestCoord = frustumBounds.z;
         }
 
-        largestCoord += 5.0;
+        
         var lightPos = new Vector3(
-            center.x - gLightDir.x * largestCoord,
-            center.y - gLightDir.y * largestCoord,
-            center.z - gLightDir.z * largestCoord);
+            center.x - gLightDir.x * frustumBounds.x,
+            center.y - gLightDir.y * frustumBounds.y,
+            center.z - gLightDir.z * frustumBounds.z);
 
         // update view matrix with new position and look at
         gLightViewCameras[cameraIndex].position = lightPos;
@@ -706,14 +707,38 @@ function update()
             largestBound = diff.z;
         }
 
-        largestBound *= 1.25;
+        // sphere test for getting the correct ortho projection size to encompass the frustum part
+        var mult = 0.5;
+        while (true) {
+            var done = true;
+            var newLargestBound = largestBound * mult;
+            for (var i = 0; i < lightSpaceFrustumCoords.length; i++) {
+                var centerToFrustumV = lightSpaceFrustumCoords[i].subtract(center);
+                var length = centerToFrustumV.magnitude();
+                if (length >= newLargestBound) {
+                    done = false;
+                    break;
+                }
+            }
+
+            if(done)
+            {
+                break;
+            }
+            else
+            {
+                mult += 0.1;
+            }
+
+        }
+
         gLightViewCameras[cameraIndex].updateOrthographicProjection(
-            center.x - largestBound * 0.5,
-            center.x + largestBound * 0.5,
-            center.y - largestBound * 0.5,
-            center.y + largestBound * 0.5,
-            center.z - largestBound * 0.5,
-            center.z + largestBound * 0.5);
+            center.x - largestBound * mult,
+            center.x + largestBound * mult,
+            center.y - largestBound * mult,
+            center.y + largestBound * mult,
+            center.z - largestBound * mult,
+            center.z + largestBound * mult);
     }
 
     //console.log('gNear = ' + gNear + ' gFar = ' + gFar);
@@ -1992,21 +2017,22 @@ function loadData() {
 /*
 **
 */
-function getFrustumBounding(camera, cascadeIndex)
+function getFrustumBounding(camera, cascadeIndex, width, height)
 {
     var cascadeDistance = [1.0, 5.0, 20.0, 50.0];
+    var aspectRatio = width / height;
 
     var near = cascadeDistance[cascadeIndex];
     var far = cascadeDistance[cascadeIndex + 1];
 
     var halfAngle = camera.fovAngle / 2;
 
-    var nearLeftX = -near * Math.tan(halfAngle);
-    var nearRightX = near * Math.tan(halfAngle);
+    var nearLeftX = -near * Math.tan(halfAngle) * aspectRatio;
+    var nearRightX = near * Math.tan(halfAngle) * aspectRatio;
     var nearZ = near;
 
-    var farLeftX = -far * Math.tan(halfAngle);
-    var farRightX = far * Math.tan(halfAngle);
+    var farLeftX = -far * Math.tan(halfAngle) * aspectRatio;
+    var farRightX = far * Math.tan(halfAngle) * aspectRatio;
     var farZ = far;
 
     var nearTopLeft = new Vector3(nearLeftX, nearRightX, nearZ);
