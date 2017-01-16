@@ -708,37 +708,69 @@ function update()
         }
 
         // sphere test for getting the correct ortho projection size to encompass the frustum part
-        var mult = 0.5;
+        var multX = 0.5;
+        var multY = 0.5;
+        var multZ = 0.5;
         while (true) {
-            var done = true;
-            var newLargestBound = largestBound * mult;
+            var doneX = true;
+            var doneY = true;
+            var doneZ = true;
+
+            var newLargestBoundX = diff.x * multX;
+            var newLargestBoundY = diff.y * multY;
+            var newLargestBoundZ = diff.z * multZ;
+
             for (var i = 0; i < lightSpaceFrustumCoords.length; i++) {
                 var centerToFrustumV = lightSpaceFrustumCoords[i].subtract(center);
                 var length = centerToFrustumV.magnitude();
-                if (length >= newLargestBound) {
-                    done = false;
+
+                if (length >= newLargestBoundX) {
+                    doneX = false;
+                    break;
+                }
+
+                if (length >= newLargestBoundY) {
+                    doneY = false;
+                    break;
+                }
+
+                if (length >= newLargestBoundZ) {
+                    doneZ = false;
                     break;
                 }
             }
 
-            if(done)
+            if(doneX && doneY && doneZ)
             {
                 break;
             }
             else
             {
-                mult += 0.1;
+                if(!doneX)
+                {
+                    multX += 0.05;
+                }
+
+                if (!doneY)
+                {
+                    multY += 0.05;
+                }
+
+                if (!doneZ)
+                {
+                    multZ += 0.05;
+                }
             }
 
         }
 
         gLightViewCameras[cameraIndex].updateOrthographicProjection(
-            center.x - largestBound * mult,
-            center.x + largestBound * mult,
-            center.y - largestBound * mult,
-            center.y + largestBound * mult,
-            center.z - largestBound * mult,
-            center.z + largestBound * mult);
+            center.x - diff.x * multX,
+            center.x + diff.x * multX,
+            center.y - diff.y * multY,
+            center.y + diff.y * multY,
+            center.z - diff.z * multZ,
+            center.z + diff.z * multZ);
     }
 
     //console.log('gNear = ' + gNear + ' gFar = ' + gFar);
