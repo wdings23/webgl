@@ -299,7 +299,7 @@ vec4 inShadow(vec4 worldPos, vec4 clipSpace)
 {
 	const float fSampleSpread = 0.001;
 	const float fSampleRate = 0.002;
-	const float fBias = 0.0;
+	const float fBias = 0.005;
 
 	mat4 lightViewMatrix = lightViewMatrix0;
 	mat4 lightProjectionMatrix = lightProjectionMatrix0;
@@ -358,7 +358,7 @@ vec4 inShadow(vec4 worldPos, vec4 clipSpace)
 			float fCurrDepth = (lightSpacePos.z / lightSpacePos.w) * 0.5 + 0.5;
 			
 			vec2 moments = vec2(depth.x, depth.y);
-			float fContrib = chebyshevUpperBound(moments, fCurrDepth);
+			float fContrib = chebyshevUpperBound(moments, fCurrDepth - fBias);
 			totalColor.x += fContrib;
 			totalColor.y += fContrib;
 			totalColor.z += fContrib;
@@ -527,7 +527,7 @@ void main()
 
 	float fMetalVal = metalRoughness.x;
 	float fRoughness = metalRoughness.y;
-	float fRefract = 0.9;
+	float fRefract = 0.1;
 
 	// tangent space vectors
 	vec3 up = vec3(0.0, 0.0, 1.0);
