@@ -670,9 +670,9 @@ function update()
 
         
         var lightPos = new Vector3(
-            center.x - gLightDir.x * frustumBounds.x,
-            center.y - gLightDir.y * frustumBounds.y,
-            center.z - gLightDir.z * frustumBounds.z);
+            center.x - gLightDir.x * largestCoord,
+            center.y - gLightDir.y * largestCoord,
+            center.z - gLightDir.z * largestCoord);
 
         // update view matrix with new position and look at
         gLightViewCameras[cameraIndex].position = lightPos;
@@ -2038,7 +2038,7 @@ function loadData() {
             gPistol = character;
         });
 
-    var floatArray = createSphere(30.0, 0.0, 0.0, 0.0, 12);
+    var floatArray = createSphere(10.0, 0.0, 0.0, 0.0, 16);
 
     gSky = new Model('sky');
     gSky.floatArray = new Float32Array(floatArray);
