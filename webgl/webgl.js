@@ -29,6 +29,8 @@ var gSky;
 
 var gGround = {vbo: null, textures: null};
 
+var gScreenShot = false;
+
 var MRTEnum =
 {
     NORMAL: 0,
@@ -198,6 +200,14 @@ var gLookAngleX = 0.0;
 var gLookAngleY = 0.0;
 function initGL()
 {
+    var origin = new Vector3(0.0, 1.0, 1.0);
+    var direction = new Vector3(1.0, 1.0, 0.0);
+    var center = new Vector3(0.0, 0.0, 0.0);
+    var radius = 5.0;
+    direction.normalize();
+
+    testRaySphere(origin, direction, center, radius);
+
     var canvas = document.getElementById("glcanvas");
     gl = canvas.getContext("webgl");
     if (!gl)
@@ -548,7 +558,9 @@ function handleKeyboard()
         gCamera.position.y -= speed;
         gCamera.lookAt.y -= speed;
     }
-
+    else if (gKeydown['k']) {
+        gScreenShot = true;
+    }
 
 
     if (Math.abs(gBob) > 0.5) {
@@ -600,8 +612,14 @@ function tick()
     update();
     drawFromLight();
 
-    drawMRT('mrt');
-    drawMRTFinal();
+    if (gScreenShot) {
+        makeEnvironmentMap(new Vector3(0.0, 1.0, 0.0));
+        gScreenShot = false;
+    }
+    else {
+        drawMRT(gCamera, 'mrt');
+        drawMRTFinal();
+    }
 
     updateUI();
 }
@@ -621,11 +639,11 @@ function update()
         gInc *= -1.0;
     }
 
-    gLightDir.x += 0.001 * -gInc;
-    gLightDir.z += 0.001 * gInc;
-    gValZ += 0.001 * gInc;
+    //gLightDir.x += 0.001 * -gInc;
+    //gLightDir.z += 0.001 * gInc;
+    //gValZ += 0.001 * gInc;
 
-    gLightDir.normalize();
+    //gLightDir.normalize();
 
     var canvas = document.getElementById('glcanvas');
 
@@ -1731,40 +1749,6 @@ function drawScene(shaderName, newFrameBuffer, camera)
                 0);
         }
 
-        // pistol
-        {
-            var matRotX = new Matrix44();
-            var matRotY = new Matrix44();
-            var matRotZ = new Matrix44();
-            var matRotYX = new Matrix44();
-            var matRotZYX = new Matrix44();
-            var matTrans = new Matrix44();
-
-            matRotX.rotateX(gLookAngleY);
-            matRotY.rotateY(gLookAngleX)
-            matRotZ.rotateZ(Math.PI);
-            matRotYX = matRotY.multiply(matRotX);
-            matRotZYX = matRotZ.multiply(matRotYX);
-            matTrans.translate(2.0, 1.0, 0.0);
-            //var matModel = matTrans.multiply(matRotZYX);
-
-            //var mat0 = cameraTangentMatrix.multiply(matTrans);
-            var matModel = matTrans.multiply(matRotYX); // matRotZYX.multiply(mat0);
-
-            drawCharacters(
-                [gPistol],
-                [matTrans],
-                [new Matrix44()],
-                modelMatrixUniform,
-                normalMatrixUniform,
-                vertexAttrib,
-                normalAttrib,
-                uvAttrib,
-                true,
-                0);
-        }
-
-
         // ground
         (function drawGround()
         {
@@ -1888,8 +1872,8 @@ function drawFromLight()
 /*
 **
 */
-function drawMRT(shaderName) {
-    drawScene('mrt', gMRTFramebuffer, gCamera);
+function drawMRT(camera, shaderName) {
+    drawScene('mrt', gMRTFramebuffer, camera);
 }
 
 
@@ -2156,4 +2140,59 @@ function getBounds(coords) {
     }
 
     return [smallest, largest];
+}
+
+function testRaySphere(origin, direction, center, radius)
+{
+    var radius2 = radius * radius;
+    var l = center.subtract(origin);
+    var tca = l.dot(direction);
+    var d2 = l.dot(l) - tca * tca;
+    if(d2 > radius2)
+    {
+        return [-1, -1];
+    }
+
+    var thc = Math.sqrt(radius2 - d2);
+    var t0 = tca - thc;
+    var t1 = tca + thc;
+                
+    return [t0, t1];
+}
+
+/*
+**
+*/
+function makeEnvironmentMap(position)
+{
+    var canvas = document.getElementById('glcanvas');
+
+    var lookAt = new Vector3(position.x, position.y, position.z + 50.0);
+    var camera = new Camera(position, lookAt);
+
+    camera.computeViewMatrix();
+    camera.updatePerspectiveProjection(100.0, 0.5, canvas.clientWidth, canvas.clientHeight);
+
+    drawMRT(camera, 'mrt');
+    drawMRTFinal();
+
+    var arrayBuffer = new ArrayBuffer(canvas.clientWidth * canvas.clientHeight * 4);
+    var uint8Array = new Uint8Array(arrayBuffer);
+    gl.readPixels(0, 0, canvas.clientWidth, canvas.clientHeight, gl.RGBA, gl.UNSIGNED_BYTE, uint8Array);
+
+    var imageCanvas = document.createElement('canvas');
+    imageCanvas.width = canvas.width;
+    imageCanvas.height = canvas.height;
+    var context = imageCanvas.getContext('2d');
+    var imageData = context.createImageData(canvas.clientWidth, canvas.clientHeight);
+    imageData.data.set(uint8Array);
+    context.putImageData(imageData, 0, 0);
+
+    var img = new Image();
+    img.src = rotateCanvas.toDataURL();
+
+    var link = document.createElement('a');
+    link.href = img.src;
+    link.download = 'image.png';
+    link.click();
 }
