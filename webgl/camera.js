@@ -13,14 +13,11 @@ Camera = function(pos, lookAt)
 Camera.prototype.computeViewMatrix = function()
 {
     var up = new Vector3(0.0, 1.0, 0.0);
-    var lookAt = gCamera.lookAt.subtract(gCamera.position);
+    var lookAt = this.lookAt.subtract(this.position);
     lookAt.normalize();
     if (Math.abs(lookAt.y) >= 0.9999) {
         up.x = 0.0; up.y = 0.0; up.z = 1.0;
     }
-
-    var lookAt = this.lookAt.subtract(this.position);
-    lookAt.normalize();
 
     var zAxis = lookAt;
     var xAxis = up.cross(lookAt);

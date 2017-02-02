@@ -31,6 +31,11 @@ var gGround = {vbo: null, textures: null};
 
 var gScreenShot = false;
 
+var gCaptureFrameBuffer;
+var gaCaptureTextures;
+var gCaptureDepthTexture;
+var gFinalCaptureFrameBuffer;
+
 var MRTEnum =
 {
     NORMAL: 0,
@@ -296,7 +301,10 @@ function initGL()
     {
         gl.getExtension("OES_standard_derivatives");
 
-        [gMRTFramebuffer, gaMRTTextures, gDepthTexture] = createFBTextures();
+        [gMRTFramebuffer, gaMRTTextures, gDepthTexture] = createFBTextures(canvas.clientWidth, canvas.clientHeight);
+        [gCaptureFrameBuffer, gaCaptureTextures, gCaptureDepthTexture] = createFBTextures(128, 128);
+        gFinalCaptureFrameBuffer = createFrameBuffer(128, 128);
+
         [gLightViewFrameBuffers[0], gLightViewTextures[0]] = createLightViewFrameBuffer();
         [gLightViewFrameBuffers[1], gLightViewTextures[1]] = createLightViewFrameBuffer();
         [gLightViewFrameBuffers[2], gLightViewTextures[2]] = createLightViewFrameBuffer();
@@ -617,8 +625,8 @@ function tick()
         gScreenShot = false;
     }
     else {
-        drawMRT(gCamera, 'mrt');
-        drawMRTFinal();
+        drawMRT(gMRTFramebuffer, gCamera, 'mrt');
+        drawMRTFinal(null, gaMRTTextures);
     }
 
     updateUI();
@@ -1211,6 +1219,59 @@ function drawCrossHair(buffer, numLinePts)
 /*
 **
 */
+function createFrameBuffer(width, height)
+{
+    var drawBuffersEXT = gl.getExtension('WEBGL_draw_buffers');
+    var oldFB = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+
+    var frameBuffer = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
+
+    var depthRenderBuffer = gl.createRenderbuffer();
+    gl.bindRenderbuffer(gl.RENDERBUFFER, depthRenderBuffer);
+    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depthRenderBuffer);
+
+    var texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        width,
+        height,
+        0,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        null);
+
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, drawBuffersEXT.COLOR_ATTACHMENT0_WEBGL, gl.TEXTURE_2D, texture, 0);
+
+    drawBuffersEXT.drawBuffersWEBGL([drawBuffersEXT.COLOR_ATTACHMENT0_WEBGL]);
+    for (var i = 0; i < 100; i++) {
+        var status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+        console.log('status = ' + status);
+        if (status == gl.FRAMEBUFFER_COMPLETE) {
+            break;
+        }
+        else {
+            debugger;
+        }
+    }
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, oldFB);
+    gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+
+    return frameBuffer;
+}
+
+/*
+**
+*/
 function createLightViewFrameBuffer()
 {
     var drawBuffersEXT = gl.getExtension('WEBGL_draw_buffers');
@@ -1271,14 +1332,13 @@ function createLightViewFrameBuffer()
 /*
 **
 */
-function createFBTextures()
+function createFBTextures(width, height)
 {
     console.log(gl.getSupportedExtensions());
 
     var drawBuffersEXT = gl.getExtension('WEBGL_draw_buffers');
     var floatingPointTextureEXT = gl.getExtension('OES_texture_float');
-    var canvas = document.getElementById('glcanvas');
-
+    
     if (floatingPointTextureEXT == null || drawBuffersEXT == null)
     {
         debugger;
@@ -1301,8 +1361,8 @@ function createFBTextures()
             gl.TEXTURE_2D,
             0,
             gl.RGBA,
-            canvas.width,
-            canvas.height,
+            width,
+            height,
             0,
             gl.RGBA,
             gl.FLOAT,
@@ -1322,7 +1382,7 @@ function createFBTextures()
 
     var depthRenderBuffer = gl.createRenderbuffer();
     gl.bindRenderbuffer(gl.RENDERBUFFER, depthRenderBuffer);
-    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, canvas.width, canvas.height);
+    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
     gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depthRenderBuffer);
 
     drawBuffersEXT.drawBuffersWEBGL([
@@ -1347,7 +1407,7 @@ function createFBTextures()
         }
     }
 
-    var depthTexture = createDepthTexture(canvas.width, canvas.height);
+    var depthTexture = createDepthTexture(width, height);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, oldFB);
     gl.bindRenderbuffer(gl.RENDERBUFFER, null);
@@ -1872,15 +1932,18 @@ function drawFromLight()
 /*
 **
 */
-function drawMRT(camera, shaderName) {
-    drawScene('mrt', gMRTFramebuffer, camera);
+function drawMRT(frameBuffer, camera, shaderName) {
+    drawScene('mrt', frameBuffer, camera);
 }
 
 
 /*
 **
 */
-function drawMRTFinal(quadBuffer) {
+function drawMRTFinal(frameBuffer, mrtTextures, screenshotBuffer) {
+    var oldFB = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
+
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     var shader = gShaderManager.getShaderProgram('mrt_pbr');
@@ -1981,7 +2044,7 @@ function drawMRTFinal(quadBuffer) {
 
         for (var i = 0; i <= MRTEnum.NUM_MRT; i++) {
             gl.activeTexture(gl.TEXTURE0 + i + 1);
-            gl.bindTexture(gl.TEXTURE_2D, gaMRTTextures[i]);
+            gl.bindTexture(gl.TEXTURE_2D, mrtTextures[i]);
         }
 
         for (var i = 0; i < gLightViewTextures.length; i++) {
@@ -2001,10 +2064,42 @@ function drawMRTFinal(quadBuffer) {
         gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
 
+    if (screenshotBuffer != undefined)
+    {
+        gl.readPixels(0, 0, 128, 128, gl.RGBA, gl.UNSIGNED_BYTE, screenshotBuffer);
+        for(var y = 0; y < 128 / 2; y++)
+        {
+            for(var x = 0; x < 128; x++)
+            {
+                for(var pix = 0; pix < 4; pix++)
+                {
+                    var index0 = (y * 128 + x) * 4 + pix;
+                    var index1 = ((128 - y - 1) + x) * 4 + pix;
+
+                    var temp = screenshotBuffer[index0];
+                    screenshotBuffer[index0] = screenshotBuffer[index1];
+                    screenshotBuffer[index1] = temp;
+                }
+            }
+        }
+    }
+
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, oldFB);
+
+    
+    drawRenderTargets(gaCaptureTextures);
+}
+
+/*
+**
+*/
+function drawRenderTargets(mrtTextures)
+{
     gl.disable(gl.DEPTH_TEST);
     drawCrossHair(gCrossHairInfo[0], gCrossHairInfo[1]);
     for (var i = 0; i < gaMRTQuadBuffer.length; i++) {
-        drawQuad(gaMRTQuadBuffer[i], gaMRTTextures[i]);
+        drawQuad(gaMRTQuadBuffer[i], mrtTextures[i]);
     }
 
     for (var i = 0; i < gLightViewQuadBuffers.length; i++) {
@@ -2165,34 +2260,52 @@ function testRaySphere(origin, direction, center, radius)
 */
 function makeEnvironmentMap(position)
 {
-    var canvas = document.getElementById('glcanvas');
+    var lookV = [
+        new Vector3(1.0, 0.0, 0.0),
+        new Vector3(-1.0, 0.0, 0.0),
+        new Vector3(0.0, 1.0, 0.0),
+        new Vector3(0.0, -1.0, 0.0),
+        new Vector3(0.0, 0.0, -1.0),
+        new Vector3(0.0, 0.0, 1.0)
+    ];
 
-    var lookAt = new Vector3(position.x, position.y, position.z + 50.0);
-    var camera = new Camera(position, lookAt);
+    for (var dir = 0; dir < lookV.length; dir++) {
+        var canvas = document.getElementById('glcanvas');
 
-    camera.computeViewMatrix();
-    camera.updatePerspectiveProjection(100.0, 0.5, canvas.clientWidth, canvas.clientHeight);
+        var lookAt = new Vector3(position.x + lookV[dir].x * 50.0, position.y + lookV[dir].y * 50.0, position.z + lookV[dir].z * 50.0);
+        var camera = new Camera(position, lookAt);
 
-    drawMRT(camera, 'mrt');
-    drawMRTFinal();
+        gl.viewport(0, 0, 128, 128);
 
-    var arrayBuffer = new ArrayBuffer(canvas.clientWidth * canvas.clientHeight * 4);
-    var uint8Array = new Uint8Array(arrayBuffer);
-    gl.readPixels(0, 0, canvas.clientWidth, canvas.clientHeight, gl.RGBA, gl.UNSIGNED_BYTE, uint8Array);
+        camera.computeViewMatrix();
+        camera.updatePerspectiveProjection(100.0, 0.5, 128, 128);
 
-    var imageCanvas = document.createElement('canvas');
-    imageCanvas.width = canvas.width;
-    imageCanvas.height = canvas.height;
-    var context = imageCanvas.getContext('2d');
-    var imageData = context.createImageData(canvas.clientWidth, canvas.clientHeight);
-    imageData.data.set(uint8Array);
-    context.putImageData(imageData, 0, 0);
+        var arrayBuffer = new ArrayBuffer(128 * 128 * 4);
+        var uint8Array = new Uint8Array(arrayBuffer);
 
-    var img = new Image();
-    img.src = rotateCanvas.toDataURL();
+        drawMRT(gCaptureFrameBuffer, camera, 'mrt');
+        drawMRTFinal(gFinalCaptureFrameBuffer, gaCaptureTextures, uint8Array);
 
-    var link = document.createElement('a');
-    link.href = img.src;
-    link.download = 'image.png';
-    link.click();
+        //var arrayBuffer = new ArrayBuffer(canvas.clientWidth * canvas.clientHeight * 4);
+        //var uint8Array = new Uint8Array(arrayBuffer);
+        //gl.readPixels(0, 0, canvas.clientWidth, canvas.clientHeight, gl.RGBA, gl.UNSIGNED_BYTE, uint8Array);
+
+        var imageCanvas = document.createElement('canvas');
+        imageCanvas.width = 128;
+        imageCanvas.height = 128;
+        var context = imageCanvas.getContext('2d');
+        var imageData = context.createImageData(128, 128);
+        imageData.data.set(uint8Array);
+        context.putImageData(imageData, 0, 0);
+
+        var img = new Image();
+        img.src = imageCanvas.toDataURL();
+
+        var link = document.createElement('a');
+        link.href = img.src;
+        link.download = 'image' + dir + '.png';
+        link.click();
+    }
+
+    gl.viewport(0, 0, canvas.clientWidth, canvas.clientHeight);
 }

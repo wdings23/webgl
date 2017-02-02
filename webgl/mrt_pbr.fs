@@ -560,7 +560,7 @@ void main()
 	additionalLightPos[1] = vec3(-4.0, 8.0, -10.0);
 	
 	vec3 additionalLightColor = vec3(0.0, 0.0, 0.0);
-	for(int i = 0; i < 2; i++)
+	/*for(int i = 0; i < 2; i++)
 	{
 		vec3 color = computeSpecular(
 			vec3(0.5),
@@ -572,7 +572,7 @@ void main()
 			additionalLightPos[i]);
 
 		additionalLightColor += color;
-	}
+	}*/
 
 
 	// specular
