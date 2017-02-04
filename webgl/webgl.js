@@ -2074,7 +2074,7 @@ function drawMRTFinal(frameBuffer, mrtTextures, screenshotBuffer) {
                 for(var pix = 0; pix < 4; pix++)
                 {
                     var index0 = (y * 128 + x) * 4 + pix;
-                    var index1 = ((128 - y - 1) + x) * 4 + pix;
+                    var index1 = ((128 - y - 1) * 128 + x) * 4 + pix;
 
                     var temp = screenshotBuffer[index0];
                     screenshotBuffer[index0] = screenshotBuffer[index1];

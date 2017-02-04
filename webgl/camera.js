@@ -72,7 +72,7 @@ Camera.prototype.updateOrthographicProjection = function (left, right, bottom, t
 
 Camera.prototype.updatePerspectiveProjection = function(far, near, width, height)
 {
-    var fov = Math.tan(this.fovAngle / Math.PI);
+    var fov = 1.0 / Math.tan(this.fovAngle * 0.5);
 
     var oneOverFarMinusNear = 1.0 / (far - near);
     var aspectRatio = width / height;
