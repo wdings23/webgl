@@ -38,10 +38,15 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <Content Include="application.js" />
     <Content Include="camera.js" />
+    <Content Include="gl_utils.js" />
     <Content Include="matrix.js" />
     <Content Include="model.js" />
     <Content Include="character.js" />
+    <Content Include="model_loader.js" />
+    <Content Include="model_utils.js" />
+    <Content Include="scene_render.js" />
     <Content Include="shader.js" />
     <Content Include="shadermanager.js" />
     <Content Include="vector.js" />

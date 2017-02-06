@@ -1,3 +1,20 @@
+var ShaderProgramManager =
+{
+    manager : null,
+
+    get : function()
+    {
+        if (ShaderProgramManager.manager == null)
+        {
+            ShaderProgramManager.manager = new ShaderManager();
+            ShaderProgramManager.manager.readInAllShaders('shaders');
+        }
+
+        return ShaderProgramManager.manager;
+    },
+}
+
+
 ShaderProgram = function (name, vertexShader, fragmentShader, program)
 {
     this.name = name;
@@ -83,6 +100,8 @@ ShaderManager.prototype.finishLoading = function()
 
 function compileShaderProgram(shaderManager, programName, vertexSrc, fragmentSrc)
 {
+    var ext = gl.getExtension('GL_OES_standard_derivatives');
+
     // get the shader file as new http request
     var vertexClient = new XMLHttpRequest();
     var vertexShader = null;
