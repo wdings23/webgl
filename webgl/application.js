@@ -9,7 +9,6 @@ Application = function (canvas) {
 
     this.glUtils = new GLUtils(canvas);
     
-    this.models = [];
     this.canvas = canvas;
     this.takeScreenShot = false;
 
@@ -24,7 +23,6 @@ Application = function (canvas) {
     this.lightViewTextures = new Array(3);
     this.lightViewCameras = [];
 
-    this.ground = { vbo: null, textures: null };
     this.lookAngleX = 0.0;
     this.lookAngleY = 0.0;
 
@@ -38,62 +36,14 @@ Application.prototype.init = function () {
     var self = this;
     gl.getExtension("OES_standard_derivatives");
 
-    var modelLoader = new ModelLoader();
-    modelLoader.load('models/dva/dva.xml',
-        function (character) {
-            self.models.push(character);
-        });
-
     this.initEvents();
 
     if (this.glUtils.gl) {
-
-        [this.mrtFramebuffer, this.mrtTextures, this.depthTexture] = this.glUtils.createMRTTextures(this.canvas.clientWidth, this.canvas.clientHeight);
-        
-        
-        [this.lightViewFrameBuffers[0], this.lightViewTextures[0]] = this.glUtils.createLightViewFrameBuffer(this.canvas.clientWidth, this.canvas.clientHeight);
-        [this.lightViewFrameBuffers[1], this.lightViewTextures[1]] = this.glUtils.createLightViewFrameBuffer(this.canvas.clientWidth, this.canvas.clientHeight);
-        [this.lightViewFrameBuffers[2], this.lightViewTextures[2]] = this.glUtils.createLightViewFrameBuffer(this.canvas.clientWidth, this.canvas.clientHeight);
-
-        
-        this.mrtFinalQuadBuffer = ModelUtils.createQuad(2.0, 0.0, 0.0);
-
-        modelLoader.load('http://localhost:8000/models/pokeball/pokeball.xml',
-            function (character) {
-                self.models.push(character);
-            });
-
-        var floatArray = ModelUtils.createSphere(80.0, 0.0, 0.0, 0.0, 16);
-
-        this.sky = new Model('sky');
-        this.sky.floatArray = new Float32Array(floatArray);
-        this.sky.updateVBO();
-        this.sky.numFaces = (this.sky.floatArray.length / 8) / 3;
-
-        this.ground.vbo = ModelUtils.createGround(20.0, 0.0, -0.25, 0.0);
-        (function createGroundTextures() {
-            self.glUtils.createTextures2(['ground_albedo.jpeg', 'ground_metallic.jpeg', 'ground_roughness.jpeg', 'ground_normal.jpeg'],
-                function (textures) {
-                    self.ground.textures = textures;
-                });
-        })();
-
-        this.crossHairInfo = ModelUtils.createCrossHair(0.04);
 
         this.camera = new Camera(new Vector3(0.0, 1.0, -2.0), new Vector3(0.0, 0.0, 100.0));
         this.lightViewCameras.push(new Camera(new Vector3(-6.0, 10.0, 4.0), new Vector3(0.0, 0.0, 0.0)));
         this.lightViewCameras.push(new Camera(new Vector3(-6.0, 10.0, 4.0), new Vector3(0.0, 0.0, 0.0)));
         this.lightViewCameras.push(new Camera(new Vector3(-6.0, 10.0, 4.0), new Vector3(0.0, 0.0, 0.0)));
-
-        this.environmentMap = this.glUtils.createCubeTexture(
-            [
-                ['rightImage', gl.TEXTURE_CUBE_MAP_POSITIVE_X],
-                ['leftImage', gl.TEXTURE_CUBE_MAP_NEGATIVE_X],
-                ['topImage', gl.TEXTURE_CUBE_MAP_POSITIVE_Y],
-                ['bottomImage', gl.TEXTURE_CUBE_MAP_NEGATIVE_Y],
-                ['backImage', gl.TEXTURE_CUBE_MAP_POSITIVE_Z],
-                ['frontImage', gl.TEXTURE_CUBE_MAP_NEGATIVE_Z],
-            ]);
 
         this.tick();
     }
@@ -193,29 +143,7 @@ Application.prototype.tick = function ()
     }
 
     this.update();
-    this.glUtils.gl.clearColor(1.0, 0.0, 0.0, 1.0);
-    this.glUtils.gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-    this.drawFromLight();
-    
-    if (this.takeScreenShot) {
-        this.makeEnvironmentMap(new Vector3(0.0, 1.0, 0.0));
-        this.takeScreenShot = false;
-    }
-    else {
-
-        this.drawMRT(this.mrtFramebuffer, this.camera, 'mrt');
-        this.sceneRender.drawMRTFinal(
-            this.camera, 
-            null, 
-            this.mrtTextures,
-            null,
-            this.lightViewCameras,
-            this.frustumClipZ,
-            this.environmentMap,
-            this.lightViewTextures,
-            this.mrtFinalQuadBuffer);
-    }
+    this.sceneRender.render(this.camera, this.lightViewCameras, this.frustumClipZ);
 
     this.updateUI();
 }
@@ -444,24 +372,6 @@ Application.prototype.fitShadowFrustum = function()
             center.z - diff.z * multZ,
             center.z + diff.z * multZ);
     }
-}
-
-/*
-**
-*/
-Application.prototype.drawFromLight = function ()
-{
-    this.sceneRender.drawScene('shadowmap', this.lightViewFrameBuffers[0], this.lightViewCameras[0], this.models, null, this.ground, this.environmentMap);
-    this.sceneRender.drawScene('shadowmap', this.lightViewFrameBuffers[1], this.lightViewCameras[1], this.models, null, this.ground, this.environmentMap);
-    this.sceneRender.drawScene('shadowmap', this.lightViewFrameBuffers[2], this.lightViewCameras[2], this.models, null, this.ground, this.environmentMap);
-}
-
-/*
-**
-*/
-Application.prototype.drawMRT = function (frameBuffer, camera, shaderName)
-{
-    this.sceneRender.drawScene('mrt', frameBuffer, camera, this.models, this.sky, this.ground, this.environmentMap);
 }
 
 /*

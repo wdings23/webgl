@@ -1,10 +1,23 @@
 ﻿var gl;
 
+var MRTEnum =
+{
+    NORMAL: 0,
+    CLIPSPACE: 1,
+    WORLDSPACE: 2,
+    ALBEDO: 3,
+    NORMALMAP: 4,
+    METAL_ROUGHNESS: 5,
+
+    NUM_MRT: 6,
+};
+
 /*
 **
 */
 SceneRender = function(canvas, glUtils)
 {
+    var self = this;
     this.canvas = canvas;
     gl = canvas.getContext("webgl");
     if (!gl)
@@ -15,10 +28,61 @@ SceneRender = function(canvas, glUtils)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.clearColor(0.0, 0.0, 0.0, 0.0);
 
+    this.models = [];
+    this.modelLoader = new ModelLoader();
+    this.modelLoader.load('models/dva/dva.xml',
+        function (character) {
+            self.models.push(character);
+        });
+
+    this.modelLoader.load('http://localhost:8000/models/pokeball/pokeball.xml',
+        function (character) {
+            self.models.push(character);
+        });
+
     this.glUtils = glUtils;
 
     this.shaderManager = new ShaderManager();
     this.shaderManager.readInAllShaders("shaders");
+
+    this.lightViewFrameBuffers = new Array(3);
+    this.lightViewTextures = new Array(3);
+
+    [this.mrtFramebuffer, this.mrtTextures, this.depthTexture] = this.glUtils.createMRTTextures(this.canvas.clientWidth, this.canvas.clientHeight);
+
+    [this.lightViewFrameBuffers[0], this.lightViewTextures[0]] = this.glUtils.createLightViewFrameBuffer(this.canvas.clientWidth, this.canvas.clientHeight);
+    [this.lightViewFrameBuffers[1], this.lightViewTextures[1]] = this.glUtils.createLightViewFrameBuffer(this.canvas.clientWidth, this.canvas.clientHeight);
+    [this.lightViewFrameBuffers[2], this.lightViewTextures[2]] = this.glUtils.createLightViewFrameBuffer(this.canvas.clientWidth, this.canvas.clientHeight);
+
+    this.mrtFinalQuadBuffer = ModelUtils.createQuad(2.0, 0.0, 0.0);
+
+    var floatArray = ModelUtils.createSphere(80.0, 0.0, 0.0, 0.0, 16);
+
+    this.sky = new Model('sky');
+    this.sky.floatArray = new Float32Array(floatArray);
+    this.sky.updateVBO();
+    this.sky.numFaces = (this.sky.floatArray.length / 8) / 3;
+
+    this.ground = { vbo: null, textures: null };
+    this.ground.vbo = ModelUtils.createGround(20.0, 0.0, -0.25, 0.0);
+    (function createGroundTextures() {
+        self.glUtils.createTextures2(['ground_albedo.jpeg', 'ground_metallic.jpeg', 'ground_roughness.jpeg', 'ground_normal.jpeg'],
+            function (textures) {
+                self.ground.textures = textures;
+            });
+    })();
+
+    this.crossHairInfo = ModelUtils.createCrossHair(0.04);
+
+    this.environmentMap = this.glUtils.createCubeTexture(
+        [
+            ['rightImage', gl.TEXTURE_CUBE_MAP_POSITIVE_X],
+            ['leftImage', gl.TEXTURE_CUBE_MAP_NEGATIVE_X],
+            ['topImage', gl.TEXTURE_CUBE_MAP_POSITIVE_Y],
+            ['bottomImage', gl.TEXTURE_CUBE_MAP_NEGATIVE_Y],
+            ['backImage', gl.TEXTURE_CUBE_MAP_POSITIVE_Z],
+            ['frontImage', gl.TEXTURE_CUBE_MAP_NEGATIVE_Z],
+        ]);
 
     [this.captureFrameBuffer, this.captureTextures, this.captureDepthTexture] = this.glUtils.createFBTextures(128, 128);
     this.finalCaptureFrameBuffer = this.glUtils.createFrameBuffer(128, 128);
@@ -43,6 +107,52 @@ SceneRender = function(canvas, glUtils)
 /*
 **
 */
+SceneRender.prototype.render = function(camera, lightViewCameras, frustumClipZ)
+{
+    this.glUtils.gl.clearColor(1.0, 0.0, 0.0, 1.0);
+    this.glUtils.gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    this.drawFromLight(lightViewCameras);
+
+    if (this.takeScreenShot) {
+        this.makeEnvironmentMap(new Vector3(0.0, 1.0, 0.0));
+        this.takeScreenShot = false;
+    }
+    else {
+
+        this.drawMRT(this.mrtFramebuffer, camera, 'mrt');
+        this.drawMRTFinal(
+            camera,
+            null,
+            this.mrtTextures,
+            null,
+            lightViewCameras,
+            frustumClipZ,
+            this.environmentMap,
+            this.lightViewTextures,
+            this.mrtFinalQuadBuffer);
+    }
+}
+
+/*
+**
+*/
+SceneRender.prototype.drawFromLight = function (lightViewCameras) {
+    this.drawScene('shadowmap', this.lightViewFrameBuffers[0], lightViewCameras[0], this.models, null, this.ground, this.environmentMap);
+    this.drawScene('shadowmap', this.lightViewFrameBuffers[1], lightViewCameras[1], this.models, null, this.ground, this.environmentMap);
+    this.drawScene('shadowmap', this.lightViewFrameBuffers[2], lightViewCameras[2], this.models, null, this.ground, this.environmentMap);
+}
+
+/*
+**
+*/
+SceneRender.prototype.drawMRT = function (frameBuffer, camera, shaderName) {
+    this.drawScene('mrt', frameBuffer, camera, this.models, this.sky, this.ground, this.environmentMap);
+}
+
+/*
+**
+*/
 SceneRender.prototype.drawScene = function (
     shaderName,
     newFrameBuffer,
@@ -53,10 +163,6 @@ SceneRender.prototype.drawScene = function (
     environmentMap)
 {
     var self = this;
-
-    this.ground = ground;
-    this.sky = sky;
-
     var oldFB = gl.getParameter(gl.FRAMEBUFFER_BINDING);
     gl.bindFramebuffer(gl.FRAMEBUFFER, newFrameBuffer);
 
