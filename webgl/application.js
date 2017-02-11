@@ -227,6 +227,7 @@ Application.prototype.handleKeyboard = function() {
     }
     else if (this.keyDown['k']) {
         this.takeScreenShot = true;
+        this.sceneRender.takeScreenShot = true;
     }
 }
 
