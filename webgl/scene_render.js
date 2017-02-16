@@ -73,7 +73,7 @@ SceneRender = function(canvas, glUtils)
     })();
 
     this.crossHairInfo = ModelUtils.createCrossHair(0.04);
-
+   
     this.environmentMap = this.glUtils.createCubeTexture(
         [
             ['rightImage', gl.TEXTURE_CUBE_MAP_POSITIVE_X],
@@ -84,7 +84,7 @@ SceneRender = function(canvas, glUtils)
             ['frontImage', gl.TEXTURE_CUBE_MAP_NEGATIVE_Z],
         ]);
 
-    [this.captureFrameBuffer, this.captureTextures, this.captureDepthTexture] = this.glUtils.createFBTextures(128, 128);
+    [this.captureFrameBuffer, this.captureTextures, this.captureDepthTexture] = this.glUtils.createMRTTextures(128, 128);
     this.finalCaptureFrameBuffer = this.glUtils.createFrameBuffer(128, 128);
 
     gl.enable(gl.DEPTH_TEST);
@@ -115,7 +115,7 @@ SceneRender.prototype.render = function(camera, lightViewCameras, frustumClipZ)
     this.drawFromLight(lightViewCameras);
 
     if (this.takeScreenShot) {
-        this.makeEnvironmentMap(new Vector3(0.0, 1.0, 0.0));
+        this.makeEnvironmentMap(new Vector3(0.0, 1.0, 0.0), lightViewCameras, frustumClipZ);
         this.takeScreenShot = false;
     }
     else {
@@ -467,7 +467,7 @@ SceneRender.prototype.drawCharacters = function(
 /*
 **
 */
-SceneRender.prototype.makeEnvironmentMap = function(position) {
+SceneRender.prototype.makeEnvironmentMap = function(position, lightViewCameras, frustumClipZ) {
     var lookV = [
         new Vector3(1.0, 0.0, 0.0),
         new Vector3(-1.0, 0.0, 0.0),
@@ -477,12 +477,43 @@ SceneRender.prototype.makeEnvironmentMap = function(position) {
         new Vector3(0.0, 0.0, 1.0)
     ];
 
+    var crossImageDimension = 128 * 4;
+    var crossImageArray = new ArrayBuffer(crossImageDimension * crossImageDimension * 4);
+    var crossImageUint8Array = new Uint8Array(crossImageArray);
+
     var texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
     gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
     gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+    var imagePos = [
+        [256, 128],
+        [0, 128],
+        [128, 0],
+        [128, 256],
+        [128, 384],
+        [128, 128],
+    ];
+
+    var flipYFlags = [
+        false,
+        false,
+        true,
+        false,
+        true,
+        false,
+    ];
+
+    var flipXFlags = [
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+    ]
 
     for (var dir = 0; dir < lookV.length; dir++) {
         var faceSide = gl.TEXTURE_CUBE_MAP_POSITIVE_X;
@@ -518,8 +549,17 @@ SceneRender.prototype.makeEnvironmentMap = function(position) {
         var arrayBuffer = new ArrayBuffer(128 * 128 * 4);
         var uint8Array = new Uint8Array(arrayBuffer);
 
-        drawMRT(this.captureFrameBuffer, camera, 'mrt');
-        drawMRTFinal(this.inalCaptureFrameBuffer, gaCaptureTextures, uint8Array);
+        this.drawMRT(this.captureFrameBuffer, camera, 'mrt');
+        this.drawMRTFinal(
+            camera,
+            this.finalCaptureFrameBuffer[0],
+            this.captureTextures,
+            uint8Array,
+            lightViewCameras,
+            frustumClipZ,
+            this.environmentMap,
+            this.lightViewTextures,
+            this.mrtFinalQuadBuffer);
 
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
         gl.texImage2D(
@@ -532,10 +572,6 @@ SceneRender.prototype.makeEnvironmentMap = function(position) {
             gl.RGBA,
             gl.UNSIGNED_BYTE,
             uint8Array);
-
-        //var arrayBuffer = new ArrayBuffer(canvas.clientWidth * canvas.clientHeight * 4);
-        //var uint8Array = new Uint8Array(arrayBuffer);
-        //gl.readPixels(0, 0, canvas.clientWidth, canvas.clientHeight, gl.RGBA, gl.UNSIGNED_BYTE, uint8Array);
 
         //var imageCanvas = document.createElement('canvas');
         //imageCanvas.width = 128;
@@ -552,6 +588,19 @@ SceneRender.prototype.makeEnvironmentMap = function(position) {
         //link.href = img.src;
         //link.download = 'image' + dir + '.png';
         //link.click();
+
+        writeToCrossImage(
+            crossImageUint8Array,
+            uint8Array,
+            imagePos[dir][0],
+            imagePos[dir][1],
+            128,
+            128,
+            crossImageDimension,
+            crossImageDimension,
+            flipYFlags[dir],
+            flipXFlags[dir]);
+        
     }
 
     gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
@@ -559,9 +608,71 @@ SceneRender.prototype.makeEnvironmentMap = function(position) {
 
     gl.viewport(0, 0, this.canvas.clientWidth, this.canvas.clientHeight);
 
+    var imageCanvas = document.createElement('canvas');
+    imageCanvas.width = crossImageDimension;
+    imageCanvas.height = crossImageDimension;
+    var context = imageCanvas.getContext('2d');
+    var imageData = context.createImageData(crossImageDimension, crossImageDimension);
+    imageData.data.set(crossImageUint8Array);
+    context.putImageData(imageData, 0, 0);
+
+    var img = new Image();
+    img.src = imageCanvas.toDataURL();
+
+    var link = document.createElement('a');
+    link.href = img.src;
+    link.download = 'image' + dir + '.png';
+    link.click();
+
+
+
     return texture;
 }
 
+/*
+**
+*/
+function writeToCrossImage(
+    result,
+    image,
+    imageX,
+    imageY,
+    imageWidth,
+    imageHeight,
+    resultWidth,
+    resultHeight,
+    flipY,
+    flipX)
+{
+    for(var y = 0; y < imageHeight; y++)
+    {
+        var resultY = imageY + y;
+        var currY = y;
+        if (flipY)
+        {
+            currY = imageHeight - y - 1;
+        }
+
+        for(var x = 0; x < imageWidth; x++)
+        {
+            var resultX = imageX + x;
+            var resultIndex = (resultY * resultWidth + resultX) * 4;
+         
+            var currX = x;
+            if (flipX)
+            {
+                currX = imageWidth - x - 1;
+            }
+
+            var imageIndex = (currY * imageWidth + currX) * 4;
+
+            result[resultIndex] = image[imageIndex];
+            result[resultIndex+1] = image[imageIndex+1];
+            result[resultIndex+2] = image[imageIndex+2];
+            result[resultIndex+3] = image[imageIndex+3];
+        }
+    }
+}
 
 /*
 **
