@@ -5,7 +5,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>09460c20-7c4a-4d1f-af7e-034133da7cc3</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>test_server.py</StartupFile>
+    <StartupFile>load_server.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -31,7 +31,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="get_web_page.py" />
-    <Compile Include="test_server.py" />
+    <Compile Include="load_server.py" />
   </ItemGroup>
   <Import Condition="Exists($(PtvsTargetsFile))" Project="$(PtvsTargetsFile)" />
   <Import Condition="!Exists($(PtvsTargetsFile))" Project="$(MSBuildToolsPath)\Microsoft.Common.targets" />
