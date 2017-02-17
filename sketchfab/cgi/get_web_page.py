@@ -55,6 +55,8 @@ def get_webpage(url):
 
     html_content = requests.get(url).content
     
+    model_html_name = os.path.basename(url)
+
     html_name = ''    
     html_url = ''    
 
@@ -73,7 +75,7 @@ def get_webpage(url):
                 # get the script url
                 url_index = reverse_find(script_content, 'https://', index)
                 end_index = script_content.find('.js', index) + len('.js')
-                html_name = script_content[index:end_index - len('.js')] + '.html'
+                html_name = model_html_name + '.html'
                 js_url = script_content[url_index:end_index]
                 js_basename = os.path.basename(js_url)               
                 js_noextension = os.path.splitext(js_basename)[0]
@@ -82,11 +84,12 @@ def get_webpage(url):
                 last_model_name_start = 0
                 parsed_template_content = ''
                 while True:
+                    # replace generic model name with the html model name
                     model_name_start = template_content.find("'new_model_'", last_model_name_start)
                     if model_name_start >= 0:
                         model_name_end = model_name_start + len('new_model_')
                         parsed_template_content += template_content[last_model_name_start:model_name_start]
-                        parsed_template_content += "'" + js_noextension + '_'
+                        parsed_template_content += "'" + model_html_name + '_'
                         
                         last_model_name_start = model_name_end + 1
                     else:
@@ -155,7 +158,7 @@ def main():
     html_name = get_webpage(url)
     
     if len(html_name):
-        webbrowser.open('http://localhost:8675/' + html_name, new = 2)    
+        webbrowser.open('http://localhost:8888/' + html_name, new = 2)    
       
 ##
 if __name__ == '__main__':

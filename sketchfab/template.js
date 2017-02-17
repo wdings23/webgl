@@ -31,6 +31,8 @@ function checkModelCreated(obj)
 
 function saveModel(obj)
 {
+    var matrix = obj._model;
+
     var model = new Model();
     model.instanceID = obj._geometry._primitives[0].indices._instanceID;
 
@@ -58,7 +60,19 @@ function saveModel(obj)
         model.verts.push(vertices[i + 1] * modelScale);
         model.verts.push(vertices[i + 2] * modelScale);
 
-        dataOutput += 'v ' + (vertices[i] * modelScale) + ' ' + (vertices[i + 2] * modelScale) + ' ' + (vertices[i + 1] * modelScale) + '\n';
+        var x = vertices[i];
+        var y = vertices[i + 2];
+        var z = vertices[i + 1];
+
+        var xformX = matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12];
+        var xformY = matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13];
+        var xformZ = matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14];
+
+        //xformX *= modelScale;
+        //xformY *= modelScale;
+        //xformZ *= modelScale;
+
+        dataOutput += 'v ' + xformX + ' ' + xformY + ' ' + xformZ + '\n';
     }
 
     var uvs = null;

@@ -101,7 +101,7 @@ class FileServer(BaseHTTPServer.HTTPServer):
 
 ##
 def main():
-    httpd = FileServer(('', 8675), Handler)
+    httpd = FileServer(('', 8888), Handler)
     httpd.serve_stuff()
 
 ##
