@@ -117,9 +117,9 @@ def get_webpage(url):
 
                 # prettify javascript
                 pretty_js = jsbeautifier.beautify_file(js_basename).decode('ascii', 'ignore')
-                pretty_file = open('pretty-' + js_basename, 'wb')
-                pretty_file.write(pretty_js)
-                pretty_file.close()                
+                #pretty_file = open('pretty-' + js_basename, 'wb')
+                #pretty_file.write(pretty_js)
+                #pretty_file.close()                
                 
                 print('Finished prettifying')
 
@@ -137,8 +137,16 @@ def get_webpage(url):
                 new_js_content += inserted_content
                 new_js_content += pretty_js[function_content[2]:]
 
+                new_js_content2 = ''
+                texture_start = new_js_content.find('applyTexImage2D: function()');
+                if texture_start >= 0:
+                    texture_start = new_js_content.find('{', texture_start) + 1
+                    new_js_content2 += new_js_content[:texture_start]
+                    new_js_content2 += '\nsaveImageSrc(this);\n'
+                    new_js_content2 += new_js_content[texture_start:]  
+
                 new_js_file = open('new-' + js_basename, 'wb')
-                new_js_file.write(new_js_content)
+                new_js_file.write(new_js_content2)
                 new_js_file.close()
 
                 print('Finished new javascript: %s' % ('new-' + js_basename))

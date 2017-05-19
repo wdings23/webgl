@@ -88,11 +88,13 @@ function saveModel(obj)
         }
     }
 
-    for (var i = 0; i < uvs.length; i += 2) {
-        model.uvs.push(uvs[i]);
-        model.uvs.push(uvs[i + 1]);
+    if (uvs != null) {
+        for (var i = 0; i < uvs.length; i += 2) {
+            model.uvs.push(uvs[i]);
+            model.uvs.push(uvs[i + 1]);
 
-        dataOutput += 'vt ' + uvs[i] + ' ' + uvs[i + 1] + '\n';
+            dataOutput += 'vt ' + uvs[i] + ' ' + uvs[i + 1] + '\n';
+        }
     }
 
     if ('Normal' in obj._geometry._attributes) {
@@ -188,29 +190,39 @@ function saveModel(obj)
     ++gNumTotalModels;
 }
 
-function saveImageSrc(arguments)
-{
-    if (arguments[arguments.length - 1] != null && arguments[arguments.length - 1] instanceof Image) {
-        var image = arguments[arguments.length - 1];
-        var imageSrc = new String(image.src);
-        var baseName = imageSrc.substring(imageSrc.lastIndexOf('/') + 1);
-        var extension = imageSrc.substring(imageSrc.lastIndexOf('.') + 1);
+function saveImageSrc(obj) {
+    try {
+        console.log(obj._image._imageObject.src);
 
-        if (gTextureSrc == null)
-        {
-            gTextureSrc = new Array();
+        var path = obj._image._imageObject.src;
+        console.log('image (' + obj._image._imageObject.width + ', ' + obj._image._imageObject.height + ')');
+        var basename = path.split('/').reverse()[0];
+
+        var image = document.createElement('img');
+        image.setAttribute('crossOrigin', 'anonymous');
+        image.src = obj._image._imageObject.src;
+
+        image.onload = function () {
+            console.log('finished loading image')
+            document.body.appendChild(image);
+
+            var canvas = document.createElement('canvas');
+            canvas.width = image.width; canvas.height = image.width;
+            var ctx = canvas.getContext('2d');
+            ctx.drawImage(image, 0, 0);
+
+            var link = document.createElement('a');
+            link.href = canvas.toDataURL('image/png');
+            link.download = basename;
+            document.body.appendChild(link);
+            link.click();
+
+            document.body.removeChild(link);
         }
-
-        gTextureSrc.push(image.src);
-
-        console.log('image src = ' + image.src + ' (' + image.width + ', ' + image.height + ')');
     }
-    /*else {
-        gTextureImageData = new Array();
-        for (var i = 0; i < arguments[arguments.length - 1].length; i++) {
-            gTextureImageData.push(arguments[arguments.length - 1][i]);
-        }
-    }*/
+    catch (error) {
+        console.log('!!! ERROR GETTING IMAGE SRC !!!')
+    }
 }
 
 function setModelTexture(obj)
